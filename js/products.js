@@ -18,7 +18,7 @@ window.ARDOR_PRODUCTS = [
     photo: { front: "assets/products/ash-tank-front.png" },
     onModel: "assets/model/ash-tank.webp" },
   { id: "chrome-shirt",     name: "Chrome Script Shirt",    type: "shirt",  cat: "Tops",    colorName: "White Pinstripe",  price: 890000,  soldOut: ["XL"],
-    photo: { front: "assets/products/chrome-shirt-back.png" },
+    photo: { front: "assets/products/chrome-shirt-front.png", back: "assets/products/chrome-shirt-back.png" },
     onModel: "assets/model/chrome-shirt.webp" },
   { id: "archer-hoodie",    name: "Archer Zip Hoodie",      type: "hoodie", cat: "Hoodies", colorName: "Cloud-wash Black", price: 1590000, soldOut: [],
     photo: { front: "assets/products/archer-hoodie-front.png", back: "assets/products/archer-hoodie-back.png" },
