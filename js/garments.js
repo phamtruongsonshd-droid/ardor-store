@@ -42,7 +42,7 @@
     var seed = p.seed || (p.id.length * 7 + p.price % 97);
     var heather = !!p.heather;
     return "<defs>" +
-      '<linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a5744b"/><stop offset=".5" stop-color="#7b4d2b"/><stop offset="1" stop-color="#4f2f18"/></linearGradient>' +
+      '<linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a4a24"/><stop offset=".45" stop-color="#4a200d"/><stop offset="1" stop-color="#1c0a04"/></linearGradient>' +
       '<linearGradient id="metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6f737a"/><stop offset=".45" stop-color="#e6e8ec"/><stop offset="1" stop-color="#80848b"/></linearGradient>' +
       '<linearGradient id="side" gradientUnits="userSpaceOnUse" x1="34" y1="0" x2="266" y2="0">' +
         '<stop offset="0" stop-color="#000" stop-opacity=".36"/><stop offset=".12" stop-color="#000" stop-opacity=".1"/>' +
@@ -64,13 +64,13 @@
 
   /* ---------- móc + giá gỗ ---------- */
   var HOOK =
-    line("M150 64 L150 28 C150 13 162 5 172 11 C180 16 180 27 171 30", "#7c8087", 3.4) +
-    line("M149.1 62 L149.1 28 C149.1 14 161 6.6 170.6 12", "#eef0f3", 1, ' opacity=".85"');
+    line("M150 64 L150 28 C150 13 162 5 172 11 C180 16 180 27 171 30", "#9a7332", 3.4) +
+    line("M149.1 62 L149.1 28 C149.1 14 161 6.6 170.6 12", "#f6dea0", 1, ' opacity=".9"');
   var HANGER_D = "M66 86 C96 73 126 63 144 61 L156 61 C174 63 204 73 234 86 C237 87.5 236 92 232.5 91.5 C202 82 172 72 150 71 C128 72 98 82 67.5 91.5 C64 92 63 87.5 66 86 Z";
   var HANGER =
     path(HANGER_D, "url(#wood)") +
-    line("M68 87 C98 75 128 65 150 63.5 C172 65 202 75 232 87", "#d6a679", 0.9, ' opacity=".6"') +
-    '<rect x="146" y="58" width="8" height="9" rx="2" fill="url(#metal)"/>';
+    line("M68 87 C98 75 128 65 150 63.5 C172 65 202 75 232 87", "#ffffff", 0.9, ' opacity=".25"') +
+    '<rect x="146" y="58" width="8" height="9" rx="2" fill="#c79a48"/>';
 
   /* ---------- hình dáng từng dòng áo ----------
      Mỗi hàm trả về:
@@ -440,10 +440,10 @@
   var HANG = {
     hoodie: { kind: "top", top: 96, shoulder: 0.3, hw: 0.22 },
     zip:    { kind: "top", top: 96, shoulder: 0.3, hw: 0.22 },
-    crew:   { kind: "top", top: 132, shoulder: 0.05, hw: 0.36 },
-    tee:    { kind: "top", top: 132, shoulder: 0.08, hw: 0.3 },
-    tank:   { kind: "top", top: 132, shoulder: 0.06, hw: 0.3 },
-    shirt:  { kind: "top", top: 128, shoulder: 0.1, hw: 0.28 },
+    crew:   { kind: "top", top: 132, shoulder: 0.05, hw: 0.36, neck: true },
+    tee:    { kind: "top", top: 132, shoulder: 0.08, hw: 0.3, neck: true },
+    tank:   { kind: "top", top: 132, shoulder: 0.06, hw: 0.3, neck: true },
+    shirt:  { kind: "top", top: 128, shoulder: 0.1, hw: 0.28, neck: true },
     jeans:  { kind: "clip", top: 150, hw: 0.42 },
     pants:  { kind: "clip", top: 150, hw: 0.42 }
   };
@@ -461,35 +461,60 @@
     return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="' + 600 * K + '" height="' + 800 * K + '"><defs>' + defsMarkup + "</defs>" + body + "</svg>");
   }
+  /* Móc ARDOR: gỗ nâu sẫm đánh bóng, móc vàng đồng, chữ ARDOR khắc vàng */
   var HANG_DEFS =
-    '<linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a5744b"/><stop offset=".5" stop-color="#7b4d2b"/><stop offset="1" stop-color="#4f2f18"/></linearGradient>' +
-    '<linearGradient id="metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6f737a"/><stop offset=".45" stop-color="#e6e8ec"/><stop offset="1" stop-color="#80848b"/></linearGradient>' +
-    '<linearGradient id="metalV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef0f3"/><stop offset=".5" stop-color="#a9adb4"/><stop offset="1" stop-color="#6d7178"/></linearGradient>';
+    '<linearGradient id="wood" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1f0c05"/><stop offset=".28" stop-color="#5c2c13"/><stop offset=".5" stop-color="#8a4a24"/><stop offset=".72" stop-color="#55260f"/><stop offset="1" stop-color="#1c0a04"/></linearGradient>' +
+    '<linearGradient id="woodV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a4a24"/><stop offset=".45" stop-color="#4a200d"/><stop offset="1" stop-color="#1c0a04"/></linearGradient>' +
+    '<linearGradient id="gold" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a6324"/><stop offset=".45" stop-color="#f1d18a"/><stop offset="1" stop-color="#9c7230"/></linearGradient>' +
+    '<linearGradient id="goldV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6dea0"/><stop offset=".55" stop-color="#c79a48"/><stop offset="1" stop-color="#94692a"/></linearGradient>';
 
-  /* Lớp sau áo: móc kim loại + giá gỗ (hoặc thanh kẹp) */
-  function hangerBack(kind, hy, hw) {
-    var out =
-      line("M300 " + hy + " L300 56 C300 26 324 10 344 22 C360 32 360 54 342 60", "#7c8087", 6.4) +
-      line("M298.3 " + (hy - 6) + " L298.3 56 C298.3 28 322 13 341 24", "#eef0f3", 2, ' opacity=".85"');
-    if (kind === "clip") {
-      out += '<rect x="' + (300 - hw - 8) + '" y="' + (hy - 5) + '" width="' + (2 * hw + 16) + '" height="10" rx="5" fill="url(#metalV)"/>';
-    } else {
-      var d = "M" + (300 - hw) + " " + (hy + 0.3 * hw) + " C" + (300 - 0.55 * hw) + " " + (hy + 0.12 * hw) + " " + (300 - 0.2 * hw) + " " + hy + " 300 " + hy +
-              " C" + (300 + 0.2 * hw) + " " + hy + " " + (300 + 0.55 * hw) + " " + (hy + 0.12 * hw) + " " + (300 + hw) + " " + (hy + 0.3 * hw);
-      out += '<path d="' + d + '" fill="none" stroke="url(#wood)" stroke-width="14" stroke-linecap="round"/>' +
-        '<path d="' + d + '" fill="none" stroke="#d6a679" stroke-width="2" opacity=".55" transform="translate(0 -4)"/>' +
-        '<rect x="292" y="' + (hy - 12) + '" width="16" height="16" rx="4" fill="url(#metal)"/>';
-    }
-    return out;
+  /* Chữ ARDOR khắc vàng, ngọn lửa nhỏ phía trên (bỏ lửa khi chỗ thấp như thanh quần) */
+  function logo(y, size, withFlame) {
+    var s = size / 28;
+    return (withFlame ? flame(300, y - size * 0.72 - 3 - 9 * s, s, "url(#goldV)") : "") +
+      '<text x="300" y="' + y + '" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-weight="700" font-size="' + size +
+      '" letter-spacing="' + (size * 0.16).toFixed(2) + '" fill="url(#goldV)">ARDOR</text>';
   }
-  /* Lớp trước áo: hai kẹp kim loại cắn vào cạp quần */
-  function hangerFront(hy, hw) {
-    var out = "";
+  function hook(y0) {
+    return line("M300 " + y0 + " L300 56 C300 26 324 10 344 22 C360 32 360 54 342 60", "#9a7332", 6.4) +
+      line("M298.3 " + (y0 - 4) + " L298.3 56 C298.3 28 322 13 341 24", "#f6dea0", 2, ' opacity=".9"');
+  }
+
+  /* Lớp sau áo. Áo: hai vai gỗ (nằm trong áo) + cổ giá nhô lên khỏi cổ áo, có chữ ARDOR;
+     hoodie thì cổ giá nằm trong mũ, chỉ thấy móc. Quần: thanh gỗ ngang có chữ, viền vàng. */
+  function hangerBack(h, top, hy, hw) {
+    if (h.kind === "clip") {
+      var by = top - 14, bw = hw + 10;
+      return hook(by - 10) +
+        '<rect x="' + (300 - bw) + '" y="' + (by - 10) + '" width="' + 2 * bw + '" height="20" rx="10" fill="url(#woodV)"/>' +
+        line("M" + (300 - bw + 8) + " " + (by - 6) + " L" + (300 + bw - 8) + " " + (by - 6), "#ffffff", 1.4, ' opacity=".28"') +
+        '<rect x="' + (300 - bw + 12) + '" y="' + (by + 5) + '" width="' + (2 * bw - 24) + '" height="2.4" rx="1.2" fill="url(#gold)"/>' +
+        logo(by + 3.6, 10, false);
+    }
+    var d = "M" + (300 - hw) + " " + (hy + 0.3 * hw) + " C" + (300 - 0.55 * hw) + " " + (hy + 0.12 * hw) + " " + (300 - 0.2 * hw) + " " + hy + " 300 " + hy +
+            " C" + (300 + 0.2 * hw) + " " + hy + " " + (300 + 0.55 * hw) + " " + (hy + 0.12 * hw) + " " + (300 + hw) + " " + (hy + 0.3 * hw);
+    var out = '<path d="' + d + '" fill="none" stroke="url(#woodV)" stroke-width="16" stroke-linecap="round"/>' +
+      '<path d="' + d + '" fill="none" stroke="#ffffff" stroke-width="1.6" opacity=".25" transform="translate(0 -5)"/>';
+    if (!h.neck) return hook(hy) + out;
+    var nt = top - 34; // đỉnh cổ giá: cao hơn cổ áo 34px để thấy chữ
+    // cổ giá: mặt trên phẳng, hai bên loe dần xuống vai như móc vest
+    return hook(nt + 2) + out +
+      '<path d="M274 ' + (nt + 5) + " Q274 " + nt + " 279 " + nt + " L321 " + nt + " Q326 " + nt + " 326 " + (nt + 5) +
+        " Q328 " + (hy - 10) + " 344 " + hy + " L256 " + hy + " Q272 " + (hy - 10) + " 274 " + (nt + 5) + ' Z" fill="url(#wood)"/>' +
+      '<path d="M279 ' + nt + " L321 " + nt + '" stroke="#a5602f" stroke-width="2.2" stroke-linecap="round"/>' +
+      line("M284 " + (nt + 4) + " C289 " + (nt + 14) + " 281 " + (nt + 24) + " 286 " + hy, "#1c0a04", 0.8, ' opacity=".35"') +
+      line("M316 " + (nt + 4) + " C311 " + (nt + 16) + " 319 " + (nt + 26) + " 314 " + hy, "#1c0a04", 0.8, ' opacity=".3"') +
+      line("M276.5 " + (nt + 5) + " Q275 " + (hy - 12) + " 262 " + (hy - 2), "#ffffff", 1.4, ' opacity=".3"') +
+      logo(nt + 27, 8.6, true);
+  }
+  /* Lớp trước quần: hai kẹp vàng cắn vào cạp quần */
+  function hangerFront(top, hw) {
+    var out = "", y = top - 10;
     [-1, 1].forEach(function (s) {
       var x = 300 + s * hw * 0.78;
-      out += '<rect x="' + (x - 12) + '" y="' + (hy - 6) + '" width="24" height="44" rx="4" fill="url(#metal)"/>' +
-        '<rect x="' + (x - 12) + '" y="' + (hy + 22) + '" width="24" height="16" rx="3" fill="#5f636a" opacity=".55"/>' +
-        '<circle cx="' + x + '" cy="' + (hy + 4) + '" r="4" fill="#5c6067"/>';
+      out += '<rect x="' + (x - 11) + '" y="' + y + '" width="22" height="40" rx="4" fill="url(#gold)"/>' +
+        '<rect x="' + (x - 11) + '" y="' + (y + 26) + '" width="22" height="14" rx="3" fill="#5c4019" opacity=".45"/>' +
+        '<circle cx="' + x + '" cy="' + (y + 9) + '" r="3.6" fill="#6b4a1c"/>';
     });
     return out;
   }
@@ -500,11 +525,11 @@
       var top = h.top, maxW = 500, maxH = 800 - top - 12;
       var s = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
       var gw = img.naturalWidth * s, gh = img.naturalHeight * s;
-      var hy = h.kind === "clip" ? top - 6 : top + h.shoulder * gh;
+      var hy = top + (h.shoulder || 0) * gh;
       var hw = h.hw * gw;
       return Promise.all([
-        loadImg(svgUri(hangerBack(h.kind, hy, hw), HANG_DEFS)),
-        h.kind === "clip" ? loadImg(svgUri(hangerFront(hy, hw), HANG_DEFS)) : null
+        loadImg(svgUri(hangerBack(h, top, hy, hw), HANG_DEFS)),
+        h.kind === "clip" ? loadImg(svgUri(hangerFront(top, hw), HANG_DEFS)) : null
       ]).then(function (L) {
         var cv = document.createElement("canvas");
         cv.width = 600 * K; cv.height = 800 * K;
