@@ -762,8 +762,18 @@
     C.discToggle.setAttribute("aria-expanded", "false");
     renderCart();
   });
+  /* Thanh toán: dựng link giỏ hàng Shopify (/cart/<variant>:<qty>,...) rồi chuyển sang đó */
   $("[data-checkout]").addEventListener("click", function () {
-    toast("Checkout isn't connected yet — your cart is saved on this device.");
+    var SHOP = window.ARDOR_SHOP || {}, parts = [];
+    var ok = C.items.every(function (l) {
+      var v = SHOP.variants && SHOP.variants[l.id] && SHOP.variants[l.id][l.size];
+      if (v) parts.push(v + ":" + l.qty);
+      return !!v;
+    });
+    if (!SHOP.domain || !parts.length || !ok) { toast("Checkout isn't available for this item yet."); return; }
+    var url = "https://" + SHOP.domain + "/cart/" + parts.join(",");
+    if (C.code && CODES[C.code]) url += "?discount=" + encodeURIComponent(C.code);
+    window.location.href = url;
   });
 
   function openCart() {

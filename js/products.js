@@ -33,6 +33,14 @@ window.ARDOR_PRODUCTS = [
 
 window.ARDOR_SIZES = ["S", "M", "L", "XL"];
 
+/* Thanh toán qua Shopify: nút "Check out" chuyển giỏ hàng sang trang thanh toán của
+   cửa hàng này. variants: id sản phẩm -> size -> mã biến thể (variant ID) trên Shopify.
+   Thêm sản phẩm mới thì tạo nó trên Shopify (đủ size) rồi chép mã biến thể vào đây. */
+window.ARDOR_SHOP = {
+  domain: "ardor-9665.myshopify.com",
+  variants: {}
+};
+
 /* Mô tả theo dòng sản phẩm: dùng ở khung chi tiết. */
 window.ARDOR_COPY = {
   hoodie: { blurb: "Washed heavyweight fleece. Cropped, boxy, zipped.",
