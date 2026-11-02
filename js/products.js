@@ -38,7 +38,15 @@ window.ARDOR_SIZES = ["S", "M", "L", "XL"];
    Thêm sản phẩm mới thì tạo nó trên Shopify (đủ size) rồi chép mã biến thể vào đây. */
 window.ARDOR_SHOP = {
   domain: "ardor-9665.myshopify.com",
-  variants: {}
+  variants: {
+    "cupid-hoodie":     { S: 46494234116330, M: 46494234149098, L: 46494234181866, XL: 46494234214634 },
+    "baroque-denim":    { S: 46494309515498, M: 46494309548266, L: 46494309581034, XL: 46494309613802 },
+    "ash-tank":         { S: 46494267834602, M: 46494267867370, L: 46494267900138, XL: 46494267932906 },
+    "chrome-shirt":     { S: 46494295458026, M: 46494295490794, L: 46494295523562, XL: 46494295556330 },
+    "archer-hoodie":    { S: 46494237032682, M: 46494237065450, L: 46494237098218, XL: 46494237130986 },
+    "boxy-tee":         { S: 46494245945578, M: 46494245978346, L: 46494246011114, XL: 46494246043882 },
+    "cloud-sweatpants": { S: 46494324981994, M: 46494325014762, L: 46494325047530, XL: 46494325080298 }
+  }
 };
 
 /* Mô tả theo dòng sản phẩm: dùng ở khung chi tiết. */
