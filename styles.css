@@ -147,6 +147,19 @@ svg { overflow: visible; }
   display: grid;
   grid-template-rows: auto 1fr auto;
 }
+/* Nền bầu trời (--hero-bg đặt ở HTML vì đường dẫn ảnh khác nhau giữa web và theme Shopify).
+   Kéo lên dưới thanh điều hướng (thanh mờ kính nổi trên trời); phủ một lớp sáng để áo
+   trắng/xám vẫn tách khỏi mây, và tan dần vào màu nền ở đáy để nối liền phần lưới sản phẩm. */
+.hero--sky {
+  margin-top: calc(var(--nav-h) * -1);
+  padding-top: var(--nav-h);
+  height: 100vh;
+  height: 100svh;
+  min-height: calc(600px + var(--nav-h));
+  background:
+    linear-gradient(180deg, rgba(246, 245, 247, .5) 0%, rgba(246, 245, 247, .18) 32%, rgba(246, 245, 247, .28) 72%, var(--bg) 100%),
+    var(--hero-bg) center 35% / cover no-repeat var(--bg);
+}
 .hero__intro { text-align: center; padding-top: clamp(14px, 4.2vh, 46px); }
 
 .eyebrow {
