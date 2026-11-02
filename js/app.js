@@ -762,6 +762,12 @@
     C.discToggle.setAttribute("aria-expanded", "false");
     renderCart();
   });
+  $("[data-disc-remove]").addEventListener("click", function () {
+    C.code = null;
+    store.set("ardor-code-v1", null);
+    toast("Code removed");
+    renderCart();
+  });
   /* Thanh toán: dựng link giỏ hàng Shopify (/cart/<variant>:<qty>,...) rồi chuyển sang đó */
   $("[data-checkout]").addEventListener("click", function () {
     var SHOP = window.ARDOR_SHOP || {}, parts = [];

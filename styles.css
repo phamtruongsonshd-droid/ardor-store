@@ -399,7 +399,8 @@ svg { overflow: visible; }
 
 .detail__figure {
   position: absolute; z-index: 2;
-  --fh: min(80vh, 820px);
+  /* 58vw: màn dọc (máy tính bảng) thì áo vẫn nằm gọn bên trái, không đè lên khung chữ */
+  --fh: min(80vh, 820px, 58vw);
   height: var(--fh); width: calc(var(--fh) * .75);
   top: calc(50% - var(--fh) * .5 + 1vh);
   left: max(2vw, calc(48% - var(--fh) * .75 - 2vw));
@@ -615,6 +616,8 @@ body.cart-open .cart { transform: none; visibility: visible; transition: transfo
 .cart__code input { flex: 1; height: 36px; border: 1px solid #d6d6db; border-radius: 6px; padding: 0 10px; font: inherit; font-size: 12.5px; background: #fff; }
 .cart__code button { height: 36px; padding: 0 14px; border-radius: 6px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; }
 .cart__disc-row { display: flex; justify-content: space-between; margin: 8px 0 0; font-size: 12px; color: var(--ink-2); }
+.cart__disc-x { margin-left: 8px; font-size: 11px; color: var(--ink-3); text-decoration: underline; text-underline-offset: 2px; }
+.cart__disc-x:hover { color: var(--ink); }
 .cart__total { display: flex; justify-content: space-between; margin: 14px 0 2px; font-size: 13px; font-weight: 500; }
 .cart__total b { font-size: 14px; font-variant-numeric: tabular-nums; }
 .cart__note { margin: 0 0 14px; font-size: 10.5px; color: var(--ink-3); }
@@ -636,6 +639,8 @@ body.cart-open .cart { transform: none; visibility: visible; transition: transfo
   transition: opacity .3s, transform .45s var(--ease);
 }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+/* Giỏ đang mở: đẩy thông báo lên trên phần tổng tiền để không đè nút Check out */
+.cart-open .toast { bottom: 210px; }
 
 /* ============ Hoạt ảnh mở màn ============ */
 .js .eyebrow, .js .headline .w { opacity: 0; }
