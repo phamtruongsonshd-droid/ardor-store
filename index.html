@@ -57,20 +57,11 @@
         </h1>
       </div>
 
-      <div class="rail" data-rail>
+      <div class="rail" data-rail data-chain="assets/rail/chain.png">
         <svg class="rail__bar" data-rail-bar aria-hidden="true">
-          <defs>
-            <linearGradient id="tube" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#f4f4f6"/>
-              <stop offset=".35" stop-color="#c9c9ce"/>
-              <stop offset=".7" stop-color="#8d8d93"/>
-              <stop offset="1" stop-color="#5e5e64"/>
-            </linearGradient>
-          </defs>
           <path class="rail__shade" data-rail-shade/>
-          <path class="rail__tube" data-rail-tube stroke="url(#tube)"/>
-          <path class="rail__shine" data-rail-shine/>
         </svg>
+        <canvas class="rail__chain" data-rail-chain aria-hidden="true"></canvas>
         <div class="rail__track" data-track></div>
       </div>
 

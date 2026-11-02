@@ -213,9 +213,10 @@ svg { overflow: visible; }
 
 .rail__bar { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 .rail__bar path { fill: none; stroke-linecap: round; }
-.rail__shade { stroke: rgba(0,0,0,.13); stroke-width: 10; filter: blur(5px); transform: translateY(9px); }
-.rail__tube { stroke-width: 9; }
-.rail__shine { stroke: rgba(255,255,255,.95); stroke-width: 1.4; transform: translateY(-2.4px); }
+/* bóng mềm dưới dây xích (độ dày + độ lệch đặt bằng JS theo cỡ xích) */
+.rail__shade { stroke: rgba(0,0,0,.16); filter: blur(6px); }
+/* Dây xích: ảnh chụp thật, lặp từng đoạn dọc theo đường võng (vẽ trong app.js) */
+.rail__chain { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 
 .rail__track { position: absolute; inset: 0; z-index: 3; }
 /* Bản 3D: một canvas WebGL vẽ mọi chiếc áo; nằm giữa thanh rail và lớp nhãn giá */
@@ -667,9 +668,17 @@ body.cart-open .cart { transform: none; visibility: visible; transition: transfo
   from { opacity: 0; filter: blur(14px); transform: translateY(.16em); }
   to { opacity: 1; filter: blur(0); transform: none; }
 }
-.rail__tube, .rail__shine, .rail__shade { stroke-dasharray: 1; stroke-dashoffset: 1; }
-.is-ready .rail__tube, .is-ready .rail__shine, .is-ready .rail__shade { animation: draw 1.3s var(--ease-io) forwards; }
+.rail__shade { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.is-ready .rail__shade { animation: draw 1.3s var(--ease-io) forwards; }
 @keyframes draw { to { stroke-dashoffset: 0; } }
+/* dây xích hiện dần từ trái sang phải lúc mở trang */
+.rail__chain { clip-path: inset(0 100% 0 0); }
+.is-ready .rail__chain { animation: chainIn 1.3s var(--ease-io) forwards; }
+@keyframes chainIn { to { clip-path: inset(0 0 0 0); } }
+/* màn cảm ứng (không có chuột để làm đèn): bóng đổ tĩnh, nhẹ cho máy */
+@media (hover: none) {
+  .rail__gl { filter: drop-shadow(0 14px 14px rgba(40, 26, 12, .22)); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }

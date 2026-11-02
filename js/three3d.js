@@ -239,8 +239,12 @@ function makeRenderer(canvas, maxDpr) {
 }
 
 /* ================= RAIL ================= */
+/* Bóng đổ theo chuột: một đèn spot (gần như không phát sáng, chỉ để tính bóng) đặt trước
+   rail tại vị trí con trỏ; bóng áo in lên một "bức tường" trong suốt phía sau (ShadowMaterial).
+   Áo càng xa đèn thì bóng càng lệch ra xa. Máy cảm ứng không có đèn này (dùng bóng CSS tĩnh). */
+const WALL = 260; // tường nhận bóng nằm sau rail bao xa (px)
 const rail = {
-  renderer: null, scene: null, camera: null, groups: [], w: 0, h: 0,
+  renderer: null, scene: null, camera: null, groups: [], w: 0, h: 0, lamp: null, wall: null, lampZ: 0,
 
   mount(el) {
     const c = document.createElement("canvas");
@@ -251,6 +255,18 @@ const rail = {
     this.scene = new THREE.Scene();
     addLights(this.scene);
     this.camera = new THREE.PerspectiveCamera(16, 1, 10, 20000);
+    if (!window.matchMedia("(hover: none)").matches) {
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      const lamp = this.lamp = new THREE.SpotLight(0xffffff, 0.0001, 0, 1.05, 1, 0);
+      lamp.castShadow = true;
+      lamp.shadow.mapSize.set(2048, 2048);
+      lamp.shadow.bias = -0.0004;
+      this.scene.add(lamp, lamp.target);
+      this.wall = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ color: 0x281a0c, opacity: 0.26 }));
+      this.wall.receiveShadow = true;
+      this.scene.add(this.wall);
+    }
   },
 
   /* st: trạng thái rail 2D trong app.js (vị trí, góc xoay, độ phóng của từng chiếc) */
@@ -265,6 +281,22 @@ const rail = {
       this.camera.lookAt(st.vw / 2, -st.vh / 2, 0);
       this.camera.far = dist * 3;
       this.camera.updateProjectionMatrix();
+      if (this.wall) {
+        const f = (dist + WALL) / dist; // tường xa hơn nên phải to hơn mới phủ kín khung nhìn
+        this.wall.position.set(st.vw / 2, -st.vh / 2, -WALL);
+        this.wall.scale.set(st.vw * f * 1.6, st.vh * f * 1.6, 1);
+        // Tường xa hơn thì camera thấy bóng co về giữa; đèn đặt gần (0.7 bề rộng) để bóng
+        // vẫn toả ra xa đèn rõ ràng: lệch ≈ 12% khoảng cách từ áo tới con trỏ
+        this.lampZ = st.vw * 0.7;
+        this.lamp.shadow.camera.near = this.lampZ * 0.4;
+        this.lamp.shadow.camera.far = this.lampZ + WALL * 2;
+        this.lamp.shadow.camera.updateProjectionMatrix();
+      }
+    }
+    if (this.lamp && st.light) {
+      this.lamp.position.set(st.light.x, -st.light.y, this.lampZ);
+      this.lamp.target.position.set(st.light.x, -st.light.y, -WALL);
+      this.lamp.target.updateMatrixWorld();
     }
     const k = st.H / FH;
     st.items.forEach((it, i) => {
@@ -272,6 +304,7 @@ const rail = {
       if (!g || g.id !== it.p.id) {
         if (g) this.scene.remove(g.outer);
         const turn = makeModel(it.p.id, true);
+        turn.traverse((o) => { if (o.isMesh) o.castShadow = true; });
         const outer = new THREE.Group();
         outer.add(turn);
         this.scene.add(outer);

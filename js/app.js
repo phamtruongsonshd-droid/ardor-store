@@ -78,7 +78,9 @@
   var rail = {
     el: $("[data-rail]"),
     track: $("[data-track]"),
-    tube: $("[data-rail-tube]"), shine: $("[data-rail-shine]"), shade: $("[data-rail-shade]"),
+    shade: $("[data-rail-shade]"), chainCv: $("[data-rail-chain]"), chainImg: null,
+    // đèn ảo cho bóng đổ: vị trí đích (theo chuột trong hero) và vị trí đang trôi tới
+    lightT: null, light: { x: 0, y: 0, on: false },
     items: [], copies: 0,
     offset: 0, vel: 0, auto: 26, seek: 0,
     hover: null, hold: false, drag: null, spread: 0,
@@ -165,17 +167,65 @@
     s.setProperty("--gw", rail.W + "px");
     s.setProperty("--gh", rail.H + "px");
 
-    // Thanh rail: đường parabol võng giữa, vẽ bằng nhiều điểm cho mượt
+    // Đường võng của rail (parabol): bóng mềm bên dưới + dây xích vẽ dọc theo nó
     var d = "", n = 48;
     for (var j = 0; j <= n; j++) {
       var x = -30 + (rail.vw + 60) * j / n;
       d += (j ? " L" : "M") + x.toFixed(1) + " " + yAt(x).toFixed(1);
     }
-    [rail.tube, rail.shine, rail.shade].forEach(function (el) {
-      el.setAttribute("d", d);
-      el.setAttribute("pathLength", "1");
-    });
+    rail.chainH = clamp(rail.H * 0.055, 15, 34);
+    rail.shade.setAttribute("d", d);
+    rail.shade.setAttribute("pathLength", "1");
+    rail.shade.setAttribute("stroke-width", (rail.chainH * 0.5).toFixed(1));
+    rail.shade.style.transform = "translateY(" + (rail.chainH * 0.55).toFixed(1) + "px)";
+    if (!rail.light.on) { rail.light.x = rail.vw / 2; rail.light.y = -rail.vh * 0.25; rail.light.on = true; }
+    drawChain();
   }
+
+  /* Dây xích = một ô ảnh chụp thật (mắt tròn + mắt nghiêng) lặp liên tiếp dọc đường võng.
+     Ô rộng hơn nhịp lặp một chút (đầu cong của mắt tròn); ô sau vẽ đè ô trước nên chỗ nối liền. */
+  var CHAIN_STEP = 141.5 / 153; // nhịp lặp / bề rộng ảnh ô
+  function drawChain() {
+    var cv = rail.chainCv, img = rail.chainImg;
+    if (!cv || !img || !img.naturalWidth || !rail.vw) return;
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(rail.vw * dpr);
+    cv.height = Math.round(rail.vh * dpr);
+    var ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingQuality = "high";
+    var h = rail.chainH, w = img.naturalWidth * h / img.naturalHeight, step = w * CHAIN_STEP;
+    var x = -w * 1.5;
+    while (x < rail.vw + w) {
+      // bước theo độ dài cung để mắt xích không bị giãn ở hai đầu dốc
+      var y = yAt(x), x2 = x + step, len = Math.hypot(step, yAt(x2) - y);
+      x2 = x + step * step / len;
+      var ang = Math.atan2(yAt(x2) - y, x2 - x);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      ctx.drawImage(img, 0, -h * 0.5, w, h);
+      ctx.restore();
+      x = x2;
+    }
+  }
+  if (rail.chainCv && rail.el.dataset.chain) {
+    rail.chainImg = new Image();
+    rail.chainImg.onload = drawChain;
+    rail.chainImg.src = rail.el.dataset.chain;
+  }
+
+  /* Đèn ảo theo chuột: chuột ở đâu trong hero thì đèn ở đó, bóng áo đổ ngược ra xa đèn.
+     Rời hero thì đèn trôi về chỗ mặc định (phía trên giữa rail) */
+  (function () {
+    var hero = rail.el.closest(".hero") || rail.el;
+    hero.addEventListener("pointermove", function (e) {
+      if (e.pointerType === "touch") return;
+      var r = rail.el.getBoundingClientRect();
+      rail.lightT = { x: e.clientX - r.left, y: e.clientY - r.top };
+    });
+    hero.addEventListener("pointerleave", function () { rail.lightT = null; });
+  })();
 
   function setHover(it) {
     if (rail.hover === it) return;
@@ -244,6 +294,9 @@
 
       pickHover();
       rail.spread += ((rail.hover ? 1 : 0) - rail.spread) * damp(dt, 8);
+      var lt = rail.lightT || { x: rail.vw / 2, y: -rail.vh * 0.25 }, kl = damp(dt, 4.5);
+      rail.light.x += (lt.x - rail.light.x) * kl;
+      rail.light.y += (lt.y - rail.light.y) * kl;
 
       var gap = rail.gap, total = rail.total, items = rail.items;
       var push = Math.max(0, rail.W * 0.62 - gap) * rail.spread;
@@ -297,6 +350,11 @@
         it.el.style.transform = "translate3d(" + (x - gap / 2).toFixed(2) + "px," + it.y.toFixed(2) + "px,0)";
         it.swing.style.transform = "rotate(" + (it.sw + it.idle).toFixed(3) + "deg)";
         it.turn.style.transform = "perspective(" + rail.persp.toFixed(0) + "px) rotateY(" + it.ry.toFixed(2) + "deg) scale(" + it.s.toFixed(4) + ")";
+        // bản 2D (máy không có WebGL): bóng đổ lệch ngược hướng đèn; bản 3D tự đổ bóng trong three3d.js
+        if (!three) {
+          var sx = clamp((x - rail.light.x) * 0.05, -32, 32), sy = clamp((it.y + rail.H * 0.45 - rail.light.y) * 0.05, -8, 36);
+          it.turn.style.filter = "drop-shadow(" + sx.toFixed(1) + "px " + sy.toFixed(1) + "px 12px rgba(40,26,12,.26))";
+        }
       }
 
       // thanh tiến trình chạy vòng
