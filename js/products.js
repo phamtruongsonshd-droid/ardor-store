@@ -6,8 +6,10 @@
    Sản phẩm không có photo sẽ được vẽ bằng SVG (js/garments.js).
    onModel: ảnh người mẫu đang mặc sản phẩm (nền trắng, dọc ~4:5), ví dụ
    "assets/model/cupid-hoodie.webp". Có thì bấm vào áo trên rail sẽ hiện người mẫu
-   mặc áo đó, kèm tab "On model"; chưa có thì khung chi tiết giữ như cũ. */
-window.ARDOR_PRODUCTS = [
+   mặc áo đó, kèm tab "On model"; chưa có thì khung chi tiết giữ như cũ.
+   Trong theme Shopify (shopify-ardor/), danh sách này và ARDOR_SHOP được dựng sẵn từ
+   sản phẩm thật của cửa hàng trước khi file này chạy, nên hai khối dưới bị bỏ qua. */
+window.ARDOR_PRODUCTS = window.ARDOR_PRODUCTS || [
   { id: "cupid-hoodie",     name: "Cupid Heart Zip Hoodie", type: "hoodie", cat: "Hoodies", colorName: "Cloud-wash Black", price: 1590000, soldOut: [],
     photo: { front: "assets/products/cupid-hoodie-front.png", back: "assets/products/cupid-hoodie-back.png" },
     onModel: "assets/model/cupid-hoodie.webp" },
@@ -36,7 +38,7 @@ window.ARDOR_SIZES = ["S", "M", "L", "XL"];
 /* Thanh toán qua Shopify: nút "Check out" chuyển giỏ hàng sang trang thanh toán của
    cửa hàng này. variants: id sản phẩm -> size -> mã biến thể (variant ID) trên Shopify.
    Thêm sản phẩm mới thì tạo nó trên Shopify (đủ size) rồi chép mã biến thể vào đây. */
-window.ARDOR_SHOP = {
+window.ARDOR_SHOP = window.ARDOR_SHOP || {
   domain: "ardor-9665.myshopify.com",
   variants: {
     "cupid-hoodie":     { S: 46494234116330, M: 46494234149098, L: 46494234181866, XL: 46494234214634 },

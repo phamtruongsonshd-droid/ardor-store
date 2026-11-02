@@ -664,12 +664,26 @@
   }
 
   /* ================= GIỎ HÀNG ================= */
+  /* Web thường: giỏ lưu trong localStorage, thanh toán bằng link giỏ hàng Shopify.
+     Trong theme Shopify (ARDOR_SHOP.native): giỏ là giỏ thật của cửa hàng. C.items vẫn là
+     danh sách {id, size, qty} để vẽ; mỗi lần đổi thì gửi lên /cart/*.js rồi đọc lại giỏ.
+     Món thêm từ trang khác của cửa hàng (không phải ARDOR) gom vào một dòng "Other items". */
+  var SHOP = window.ARDOR_SHOP || {};
+  var NATIVE = !!SHOP.native;
+  var ROOT = (window.Shopify && Shopify.routes && Shopify.routes.root) || "/";
+  var BY_VARIANT = {};
+  Object.keys(SHOP.variants || {}).forEach(function (id) {
+    Object.keys(SHOP.variants[id]).forEach(function (size) { BY_VARIANT[SHOP.variants[id][size]] = { id: id, size: size }; });
+  });
+  function variantOf(l) { return SHOP.variants && SHOP.variants[l.id] && SHOP.variants[l.id][l.size]; }
+
   var C = {
     el: $("[data-cart]"), lines: $("[data-cart-lines]"), n: $("[data-cart-n]"), total: $("[data-cart-total]"),
     badge: $("[data-bag-count]"),
     discToggle: $("[data-disc-toggle]"), discForm: $("[data-disc-form]"), discInput: $("[data-disc-input]"),
     discRow: $("[data-disc-row]"), discLabel: $("[data-disc-label]"), discAmount: $("[data-disc-amount]"),
-    items: store.get("ardor-cart-v1") || [],
+    items: NATIVE ? [] : store.get("ardor-cart-v1") || [],
+    extra: { qty: 0, amount: 0 },
     code: store.get("ardor-code-v1") || null
   };
   var CODES = { ARDOR10: 0.1 };
@@ -677,11 +691,40 @@
 
   function keyOf(l) { return l.id + "|" + l.size; }
 
+  function pullCart() {
+    return fetch(ROOT + "cart.js", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (cart) {
+        var items = [], extra = { qty: 0, amount: 0 };
+        cart.items.forEach(function (li) {
+          var m = BY_VARIANT[li.variant_id];
+          if (m && byId[m.id]) items.push({ id: m.id, size: m.size, qty: li.quantity });
+          else { extra.qty += li.quantity; extra.amount += li.final_line_price / 100; }
+        });
+        C.items = items;
+        C.extra = extra;
+        renderCart();
+      })
+      .catch(function () { /* mất mạng: giữ nguyên giỏ đang vẽ */ });
+  }
+  /* Gửi thay đổi lên giỏ Shopify rồi đọc lại (hết hàng thì Shopify từ chối, giỏ tự trả về đúng) */
+  function pushCart(path, body) {
+    return fetch(ROOT + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { if (!r.ok) toast("Sorry, that size is no longer available"); })
+      .catch(function () { toast("Couldn't update the cart, please try again"); })
+      .then(pullCart);
+  }
+
   function cartAdd(id, size, qty) {
     var l = C.items.filter(function (x) { return x.id === id && x.size === size; })[0];
     if (l) l.qty = Math.min(20, l.qty + qty);
     else C.items.unshift({ id: id, size: size, qty: qty });
-    store.set("ardor-cart-v1", C.items);
+    if (NATIVE) pushCart("cart/add.js", { items: [{ id: variantOf({ id: id, size: size }), quantity: qty }] });
+    else store.set("ardor-cart-v1", C.items);
     renderCart();
     C.badge.classList.remove("is-bump"); void C.badge.offsetWidth; C.badge.classList.add("is-bump");
   }
@@ -714,11 +757,19 @@
       if (C.lines.children[idx] !== li) C.lines.insertBefore(li, C.lines.children[idx] || null);
     });
     $$(".line", C.lines).forEach(function (li) {
-      if (!seen[li.dataset.key] && !li.classList.contains("is-out")) {
+      if (li.dataset.key && !seen[li.dataset.key] && !li.classList.contains("is-out")) {
         li.classList.add("is-out");
         setTimeout(function () { li.remove(); }, 300);
       }
     });
+    var other = $(".line--other", C.lines);
+    if (C.extra.qty) {
+      if (!other) { other = document.createElement("li"); other.className = "line line--other"; }
+      C.lines.appendChild(other);
+      other.innerHTML = '<div class="line__img"></div><div><p class="line__name">Other items</p><p class="line__meta">' +
+        C.extra.qty + " added elsewhere in the store<br><a href=\"" + ROOT + 'cart">Edit in cart</a></p></div><p class="line__sum">' + money(C.extra.amount) + "</p>";
+      count += C.extra.qty; sub += C.extra.amount;
+    } else if (other) other.remove();
 
     var rate = C.code && CODES[C.code] ? CODES[C.code] : 0;
     var off = Math.round(sub * rate / 1000) * 1000;
@@ -740,8 +791,10 @@
     if (b.hasAttribute("data-inc")) l.qty = Math.min(20, l.qty + 1);
     else if (b.hasAttribute("data-dec")) l.qty -= 1;
     else if (b.hasAttribute("data-del")) l.qty = 0;
+    // change.js chỉ nhận id dạng chuỗi (mã biến thể hoặc khoá dòng), số nguyên bị từ chối
+    if (NATIVE) pushCart("cart/change.js", { id: String(variantOf(l)), quantity: l.qty });
     C.items = C.items.filter(function (x) { return x.qty > 0; });
-    store.set("ardor-cart-v1", C.items);
+    if (!NATIVE) store.set("ardor-cart-v1", C.items);
     renderCart();
   });
 
@@ -768,18 +821,19 @@
     toast("Code removed");
     renderCart();
   });
-  /* Thanh toán: dựng link giỏ hàng Shopify (/cart/<variant>:<qty>,...) rồi chuyển sang đó */
+  /* Thanh toán. Trong theme Shopify: giỏ đã là giỏ thật, sang thẳng /checkout.
+     Web thường: dựng link giỏ hàng Shopify (/cart/<variant>:<qty>,...) rồi chuyển sang đó */
   $("[data-checkout]").addEventListener("click", function () {
-    var SHOP = window.ARDOR_SHOP || {}, parts = [];
+    var disc = C.code && CODES[C.code] ? "?discount=" + encodeURIComponent(C.code) : "";
+    if (NATIVE) { window.location.href = ROOT + "checkout" + disc; return; }
+    var parts = [];
     var ok = C.items.every(function (l) {
       var v = SHOP.variants && SHOP.variants[l.id] && SHOP.variants[l.id][l.size];
       if (v) parts.push(v + ":" + l.qty);
       return !!v;
     });
     if (!SHOP.domain || !parts.length || !ok) { toast("Checkout isn't available for this item yet."); return; }
-    var url = "https://" + SHOP.domain + "/cart/" + parts.join(",");
-    if (C.code && CODES[C.code]) url += "?discount=" + encodeURIComponent(C.code);
-    window.location.href = url;
+    window.location.href = "https://" + SHOP.domain + "/cart/" + parts.join(",") + disc;
   });
 
   function openCart() {
@@ -941,6 +995,11 @@
   }
 
   renderCart();
+  if (NATIVE) {
+    pullCart();
+    // quay lại từ trang thanh toán bằng nút Back: đọc lại giỏ (có thể đã đặt hàng xong)
+    window.addEventListener("pageshow", function (e) { if (e.persisted) pullCart(); });
+  }
   loadFronts().then(function () {
     build(2);
     layout();
