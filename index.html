@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARDOR — Scene Rail</title>
+<meta name="description" content="ARDOR — Premium streetwear. Hoodies, crewnecks, tees and outerwear, cut oversized and made to last.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Allura&family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="shell" data-shell>
+
+  <!-- ===== Thanh điều hướng ===== -->
+  <header class="nav">
+    <a class="nav__logo" href="#top" aria-label="ARDOR — trang chủ">ARDOR</a>
+
+    <nav class="nav__links" aria-label="Chính">
+      <a href="#top">Home</a>
+      <a href="#collection">Collection</a>
+      <a href="#top" aria-current="page">Scene Rail</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <div class="nav__tools">
+      <div class="search" data-search>
+        <button class="search__pill" type="button" data-search-open aria-label="Tìm sản phẩm">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.8 12.8 17 17"/><path d="M14.5 2.5v3M13 4h3" class="spark"/></svg>
+          <span>Search</span>
+        </button>
+        <div class="search__panel" data-search-panel hidden>
+          <input type="search" placeholder="Search the rail…" autocomplete="off" data-search-input aria-label="Tìm sản phẩm">
+          <ul class="search__list" data-search-list></ul>
+        </div>
+      </div>
+      <a class="icon-btn" href="#contact" aria-label="Tài khoản">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3.2"/><path d="M3.8 17c.8-3.2 3.2-5 6.2-5s5.4 1.8 6.2 5"/></svg>
+      </a>
+      <button class="icon-btn bag" type="button" data-cart-open aria-label="Giỏ hàng">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 7h11l-.9 10H5.4z"/><path d="M7.5 7V5.8a2.5 2.5 0 0 1 5 0V7"/></svg>
+        <span class="bag__count" data-bag-count hidden>0</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ===== Hero: thanh rail treo áo ===== -->
+    <section class="hero" aria-label="Scene Rail">
+      <div class="hero__intro">
+        <p class="eyebrow"><b>New collection</b><i aria-hidden="true"></i><span>Premium streetwear</span></p>
+        <h1 class="headline" data-headline>
+          <span class="w">Ignite</span> <span class="w">with</span> <span class="w w--fire">ARDOR.</span>
+        </h1>
+      </div>
+
+      <div class="rail" data-rail>
+        <svg class="rail__bar" data-rail-bar aria-hidden="true">
+          <defs>
+            <linearGradient id="tube" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f4f4f6"/>
+              <stop offset=".35" stop-color="#c9c9ce"/>
+              <stop offset=".7" stop-color="#8d8d93"/>
+              <stop offset="1" stop-color="#5e5e64"/>
+            </linearGradient>
+          </defs>
+          <path class="rail__shade" data-rail-shade/>
+          <path class="rail__tube" data-rail-tube stroke="url(#tube)"/>
+          <path class="rail__shine" data-rail-shine/>
+        </svg>
+        <div class="rail__track" data-track></div>
+      </div>
+
+      <div class="hero__foot">
+        <div class="now" aria-live="polite">
+          <p class="now__hint" data-now-hint>Hover a piece · click to look closer</p>
+          <p class="now__item" data-now-item hidden><span data-now-name></span><span data-now-price></span></p>
+        </div>
+        <div class="progress" aria-hidden="true"><i data-progress></i><i data-progress></i></div>
+        <div class="foot__copy">
+          <p>Crafted in heavyweight fleece. Cut oversized. Made to last.</p>
+          <a href="#collection" class="link-arrow">Shop the Collection <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Lưới toàn bộ sản phẩm ===== -->
+    <section class="collection" id="collection" aria-labelledby="col-title">
+      <div class="collection__head">
+        <div>
+          <p class="eyebrow eyebrow--left"><b>The collection</b><i aria-hidden="true"></i><span data-count>7 pieces</span></p>
+          <h2 id="col-title" class="headline headline--sm">Every piece. <span class="w--soft">Every price.</span></h2>
+        </div>
+        <div class="filters" role="group" aria-label="Lọc theo dòng" data-filters>
+          <button type="button" aria-pressed="true" data-filter="all">All</button>
+          <button type="button" aria-pressed="false" data-filter="Hoodies">Hoodies</button>
+          <button type="button" aria-pressed="false" data-filter="Tops">Tops</button>
+          <button type="button" aria-pressed="false" data-filter="Bottoms">Bottoms</button>
+        </div>
+      </div>
+      <div class="grid" data-grid></div>
+    </section>
+
+  </main>
+
+  <footer class="footer" id="contact">
+    <div class="footer__brand">
+      <p class="footer__logo">ARDOR</p>
+      <p class="footer__line">Dressed in fire. Since 2026.</p>
+    </div>
+    <div class="footer__cols">
+      <div>
+        <p class="footer__h">Shop</p>
+        <a href="#collection">Hoodies</a><a href="#collection">Tops</a><a href="#collection">Bottoms</a>
+      </div>
+      <div>
+        <p class="footer__h">Help</p>
+        <a href="#contact">Size guide</a><a href="#contact">Shipping &amp; returns</a><a href="#contact">Care</a>
+      </div>
+      <div>
+        <p class="footer__h">Contact</p>
+        <a href="mailto:hello@ardor.vn">hello@ardor.vn</a><a href="#contact">Instagram</a><a href="#contact">TikTok</a>
+      </div>
+    </div>
+    <p class="footer__legal">© 2026 ARDOR. All rights reserved.</p>
+  </footer>
+
+</div>
+
+<!-- ===== Khung chi tiết sản phẩm ===== -->
+<div class="detail" data-detail hidden>
+  <div class="detail__veil" data-detail-close></div>
+  <button class="detail__close" type="button" data-detail-close>Close</button>
+  <span class="detail__string" data-detail-string aria-hidden="true"></span>
+  <div class="detail__figure" data-detail-figure>
+    <div class="detail__turn" data-detail-turn><img alt="" data-detail-img></div>
+    <img class="detail__look" alt="" data-detail-look hidden>
+    <p class="detail__hint" aria-hidden="true"><svg viewBox="0 0 24 12"><path d="M4 6h16M8 2 4 6l4 4M16 2l4 4-4 4"/></svg>Drag to rotate 360°</p>
+  </div>
+  <section class="detail__panel" data-detail-panel role="dialog" aria-modal="true" aria-labelledby="d-name" tabindex="-1">
+    <p class="d-index" data-d-index>1 / 15</p>
+    <h2 class="d-name" id="d-name" data-d-name></h2>
+    <p class="d-price" data-d-price></p>
+    <div class="d-tabs" role="tablist" aria-label="Mặt áo">
+      <button type="button" role="tab" aria-selected="false" data-view="model" hidden>On model</button>
+      <button type="button" role="tab" aria-selected="true" data-view="front">Front</button>
+      <button type="button" role="tab" aria-selected="false" data-view="back">Back</button>
+    </div>
+    <p class="d-label">Size</p>
+    <div class="d-sizes" role="radiogroup" aria-label="Chọn size" data-d-sizes></div>
+    <button class="d-add" type="button" data-d-add><span class="d-add__spin" aria-hidden="true"></span><span data-d-add-label>Add to cart</span></button>
+    <a class="d-viewcart" href="#" data-d-viewcart hidden>View cart <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a>
+    <div class="d-foot">
+      <span data-d-foot-name></span>
+      <button type="button" class="link-arrow" data-d-more aria-expanded="false">View product page <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></button>
+    </div>
+    <div class="d-more" data-d-details hidden>
+      <p class="d-blurb" data-d-blurb></p>
+      <ul data-d-list></ul>
+      <p class="d-color" data-d-color></p>
+    </div>
+  </section>
+</div>
+
+<!-- ===== Giỏ hàng ===== -->
+<aside class="cart" data-cart aria-label="Giỏ hàng" aria-hidden="true">
+  <header class="cart__head">
+    <h2>Cart <span class="cart__n" data-cart-n>0</span></h2>
+    <button class="cart__x" type="button" data-cart-close aria-label="Đóng giỏ hàng">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3 3 13"/></svg>
+    </button>
+  </header>
+  <ul class="cart__lines" data-cart-lines></ul>
+  <div class="cart__empty" data-cart-empty>
+    <p>Your cart is empty.</p>
+    <a href="#collection" class="link-arrow" data-cart-close>Shop the Collection <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4"/></svg></a>
+  </div>
+  <footer class="cart__foot" data-cart-foot>
+    <div class="cart__disc">
+      <button type="button" data-disc-toggle aria-expanded="false">Discount <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></button>
+      <form class="cart__code" data-disc-form hidden>
+        <input type="text" placeholder="Enter code" aria-label="Mã giảm giá" data-disc-input>
+        <button type="submit">Apply</button>
+      </form>
+      <p class="cart__disc-row" data-disc-row hidden><span data-disc-label></span><span data-disc-amount></span></p>
+    </div>
+    <p class="cart__total"><span>Estimated total</span><b data-cart-total>0₫</b></p>
+    <p class="cart__note">Taxes and shipping calculated at checkout.</p>
+    <button class="cart__checkout" type="button" data-checkout>Check out</button>
+  </footer>
+</aside>
+
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+
+<script src="js/products.js"></script>
+<script src="js/garments.js"></script>
+<script src="js/app.js"></script>
+<script type="module" src="js/three3d.js"></script>
+</body>
+</html>

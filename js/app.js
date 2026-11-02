@@ -1,0 +1,941 @@
+/* ARDOR — Scene Rail
+   1) Rail: áo treo nghiêng trên thanh cong, tự trôi; rê chuột vào áo nào thì áo đó
+      xoay mặt ra, phóng to, hai bên dạt ra; kéo/lăn ngang để lướt, áo đung đưa theo quán tính.
+   2) Bấm áo: áo bay ra khung chi tiết (FLIP), chọn mặt trước/sau, chọn size, thêm vào giỏ.
+   3) Giỏ hàng trượt từ phải, đẩy trang sang trái; lưu trong localStorage.
+   4) Lưới toàn bộ sản phẩm + tìm kiếm. */
+(function () {
+  "use strict";
+
+  var P = window.ARDOR_PRODUCTS;
+  var SIZES = window.ARDOR_SIZES;
+  var COPY = window.ARDOR_COPY;
+  var G = window.ArdorGarments;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var root = document.documentElement;
+  root.classList.add("js");
+
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function mod(a, n) { return ((a % n) + n) % n; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function damp(dt, k) { return 1 - Math.exp(-dt * k); }
+  /* Gọi fn khi hoạt ảnh xong. Tab chạy nền có thể không bao giờ phát onfinish,
+     nên có hẹn giờ dự phòng: thao tác (đóng khung, thêm giỏ) không bị kẹt. */
+  function whenDone(anim, ms, fn) {
+    var done = false;
+    function go() { if (!done) { done = true; fn(); } }
+    anim.onfinish = go;
+    setTimeout(go, ms + 150);
+  }
+
+  var vnd = new Intl.NumberFormat("vi-VN");
+  function money(v) { return vnd.format(v) + "₫"; }
+  function short(v) { return vnd.format(Math.round(v / 1000)) + "K"; }
+
+  var byId = {};
+  P.forEach(function (p, i) { p.index = i; byId[p.id] = p; });
+
+  var store = {
+    get: function (k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* chế độ riêng tư */ } }
+  };
+
+  /* ================= ẢNH ================= */
+  var IMG = {};
+  var backJobs = {};
+
+  function frontOf(p) { return IMG[p.id] ? IMG[p.id].front : ""; }
+  function backOf(p) {
+    if (!backJobs[p.id]) {
+      backJobs[p.id] = G.back(p).then(function (u) {
+        IMG[p.id].back = u;
+        return u;
+      });
+    }
+    return backJobs[p.id];
+  }
+
+  function loadFronts() {
+    return Promise.all(P.map(function (p) {
+      return G.front(p).then(function (u) {
+        IMG[p.id] = { front: u, back: null };
+      });
+    }));
+  }
+
+  /* ================= TOAST ================= */
+  var toastEl = $("[data-toast]"), toastT;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("is-on");
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { toastEl.classList.remove("is-on"); }, 2600);
+  }
+
+  /* ================= RAIL ================= */
+  var rail = {
+    el: $("[data-rail]"),
+    track: $("[data-track]"),
+    tube: $("[data-rail-tube]"), shine: $("[data-rail-shine]"), shade: $("[data-rail-shade]"),
+    items: [], copies: 0,
+    offset: 0, vel: 0, auto: 26, seek: 0,
+    hover: null, hold: false, drag: null, spread: 0,
+    pointer: { x: 0, y: 0, inside: false, touch: false },
+    W: 0, H: 0, gap: 0, vw: 0, vh: 0, railY: 0, sag: 0, total: 0, margin: 0, persp: 0,
+    start: 0, ready: false
+  };
+  var nowBox = $(".now"), nowName = $("[data-now-name]"), nowPrice = $("[data-now-price]"), nowItem = $("[data-now-item]");
+  var progress = $$("[data-progress]");
+
+  function yAt(x) {
+    var t = clamp((x - rail.vw / 2) / (rail.vw / 2), -1.25, 1.25);
+    return rail.railY + rail.sag * (1 - t * t);
+  }
+
+  function makePiece(p, copy, i) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "piece";
+    b.setAttribute("aria-label", p.name + ", " + money(p.price));
+    if (copy > 0) { b.tabIndex = -1; b.setAttribute("aria-hidden", "true"); }
+    b.innerHTML =
+      '<span class="piece__swing"><span class="piece__tag">' + short(p.price) + "</span>" +
+      '<span class="piece__turn"><img alt="" draggable="false" src="' + frontOf(p) + '"></span></span>';
+    var it = {
+      p: p, copy: copy, i: i, el: b,
+      swing: b.firstChild, turn: b.firstChild.lastChild,
+      ry0: -(66 + Math.random() * 8), ry: 0, s: 1, sw: 0, swv: 0, idle: 0,
+      ph: Math.random() * Math.PI * 2,
+      x: 0, bx: 0, y: 0, vis: true, z: false, delay: 0, enter: reduce ? 1 : 0, op: -1
+    };
+    it.ry = it.ry0;
+    if (!reduce) { b.style.opacity = 0; it.op = 0; }
+    b.addEventListener("focus", function () {
+      if (rail.pointer.inside) return;
+      setHover(it);
+      // đưa áo đang focus vào giữa khung nhìn
+      var d = it.x - rail.vw / 2;
+      if (Math.abs(d) > rail.vw / 2 - rail.W * 0.6) rail.seek = d;
+    });
+    b.addEventListener("blur", function () { if (!rail.pointer.inside && rail.hover === it) setHover(null); });
+    b.addEventListener("click", function (e) {
+      if (e.detail !== 0) return; // chuột đã được xử lý ở pointerup; đây là Enter/Space
+      openDetail(it.p, { item: it });
+    });
+    return it;
+  }
+
+  function build(copies) {
+    rail.track.innerHTML = "";
+    rail.items = [];
+    rail.copies = copies;
+    var i = 0;
+    for (var c = 0; c < copies; c++) {
+      for (var k = 0; k < P.length; k++) {
+        var it = makePiece(P[k], c, i++);
+        rail.items.push(it);
+        rail.track.appendChild(it.el);
+      }
+    }
+  }
+
+  function layout() {
+    var r = rail.el.getBoundingClientRect();
+    rail.vw = r.width;
+    rail.vh = r.height;
+    var H = clamp(rail.vh * 0.76, 190, 640);
+    if (rail.vw < 720) H = Math.min(H, rail.vw * 0.78);
+    rail.H = H;
+    rail.W = H / G.ratio;
+    rail.gap = rail.W * 0.4;
+    rail.sag = Math.min(64, rail.vw * 0.034);
+    rail.railY = Math.max(12, rail.vh * 0.07);
+    rail.margin = rail.gap * 3;
+    rail.persp = rail.W * 5.5;
+    rail.barW = progress[0].parentNode.clientWidth;
+
+    var need = Math.max(2, Math.ceil((rail.vw + rail.margin * 2 + rail.W) / (P.length * rail.gap)));
+    if (need > rail.copies) build(need);
+    rail.total = rail.items.length * rail.gap;
+
+    var s = rail.track.style;
+    s.setProperty("--gap", rail.gap + "px");
+    s.setProperty("--gw", rail.W + "px");
+    s.setProperty("--gh", rail.H + "px");
+
+    // Thanh rail: đường parabol võng giữa, vẽ bằng nhiều điểm cho mượt
+    var d = "", n = 48;
+    for (var j = 0; j <= n; j++) {
+      var x = -30 + (rail.vw + 60) * j / n;
+      d += (j ? " L" : "M") + x.toFixed(1) + " " + yAt(x).toFixed(1);
+    }
+    [rail.tube, rail.shine, rail.shade].forEach(function (el) {
+      el.setAttribute("d", d);
+      el.setAttribute("pathLength", "1");
+    });
+  }
+
+  function setHover(it) {
+    if (rail.hover === it) return;
+    if (rail.hover) rail.hover.el.style.zIndex = "";
+    rail.hover = it;
+    rail.el.classList.toggle("is-pointing", !!it);
+    if (it) {
+      it.el.style.zIndex = 5;
+      nowName.textContent = it.p.name;
+      nowPrice.textContent = money(it.p.price);
+      nowItem.hidden = false;
+      nowBox.classList.add("has-item");
+      nowItem.animate([{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "none" }], { duration: 260, easing: "ease-out" });
+    } else {
+      nowBox.classList.remove("has-item");
+      nowItem.hidden = true;
+    }
+  }
+
+  function pickHover() {
+    var pt = rail.pointer;
+    if (!pt.inside || pt.touch || rail.drag || rail.hold || !rail.ready) { if (!rail.hold) setHover(null); return; }
+    var top = rail.railY - 16, bottom = rail.railY + rail.sag + rail.H * 0.9;
+    if (pt.y < top || pt.y > bottom) { setHover(null); return; }
+    var h = rail.hover;
+    if (h && Math.abs(pt.x - h.x) < rail.W * 0.34 * h.s) return;
+    var best = null, bd = rail.gap * 0.62;
+    for (var k = 0; k < rail.items.length; k++) {
+      var it = rail.items[k];
+      if (!it.vis) continue;
+      var dx = Math.abs(pt.x - it.x);
+      if (dx < bd) { bd = dx; best = it; }
+    }
+    setHover(best);
+  }
+
+  function nearestAt(x) {
+    var best = null, bd = rail.gap * 0.7;
+    rail.items.forEach(function (it) {
+      var dx = Math.abs(x - it.x);
+      if (it.vis && dx < bd) { bd = dx; best = it; }
+    });
+    return best;
+  }
+
+  /* Mô-đun 3D (js/three3d.js). null = đang dùng ảnh 2D. */
+  var three = null;
+
+  var last = 0;
+  function frame(now) {
+    var dt = Math.min(0.05, (now - last) / 1000 || 0.016);
+    last = now;
+    var time = now / 1000;
+
+    if (rail.ready) {
+      if (!rail.drag) {
+        var target = (rail.hover || rail.hold || reduce) ? 0 : rail.auto;
+        rail.vel += (target - rail.vel) * damp(dt, rail.hover ? 6 : 1.8);
+        rail.offset += rail.vel * dt;
+      }
+      if (rail.seek) {
+        var step = rail.seek * damp(dt, 6);
+        rail.offset += step; rail.seek -= step;
+        if (Math.abs(rail.seek) < 0.5) rail.seek = 0;
+      }
+
+      pickHover();
+      rail.spread += ((rail.hover ? 1 : 0) - rail.spread) * damp(dt, 8);
+
+      var gap = rail.gap, total = rail.total, items = rail.items;
+      var push = Math.max(0, rail.W * 0.62 - gap) * rail.spread;
+      var h = rail.hover;
+      var hookOff = G.hookTop * rail.H + 3;
+      var swingTarget = clamp(-rail.vel * 0.011, -11, 11);
+      var k1 = damp(dt, 7.5);
+      var t0 = (now - rail.start) / 1000;
+
+      for (var k = 0; k < items.length; k++) {
+        items[k].bx = mod(items[k].i * gap - rail.offset, total) - rail.margin;
+      }
+      for (k = 0; k < items.length; k++) {
+        var it = items[k];
+        var x = it.bx;
+        if (h && it !== h && push > 0.01) {
+          var d = x - h.bx;
+          if (d > total / 2) d -= total; else if (d < -total / 2) d += total;
+          x += (d < 0 ? -1 : 1) * push * Math.min(1, Math.abs(d) / gap);
+        }
+        it.x = x;
+
+        var vis = x > -rail.W && x < rail.vw + rail.W;
+        if (vis !== it.vis) { it.el.style.visibility = vis ? "" : "hidden"; it.vis = vis; }
+        if (!vis) continue;
+
+        var isH = it === h;
+        it.ry += ((isH ? 0 : it.ry0) - it.ry) * k1;
+        it.s += ((isH ? 1.12 : 1) - it.s) * k1;
+
+        // lò xo đung đưa: lệch theo vận tốc rail rồi dao động tắt dần
+        var st = isH ? 0 : swingTarget;
+        it.swv += ((st - it.sw) * 34 - it.swv * 3.2) * dt;
+        it.sw += it.swv * dt;
+        it.idle += ((isH || reduce ? 0 : 0.55 * Math.sin(time * 1.2 + it.ph)) - it.idle) * k1;
+
+        // rơi xuống thanh rail lúc mở trang
+        var drop = 0;
+        if (it.enter < 1) {
+          if (!it.delay) it.delay = 0.35 + clamp(x / rail.vw, 0, 1) * 0.9 + Math.random() * 0.08;
+          var e = clamp((t0 - it.delay) / 0.9, 0, 1);
+          it.enter = e;
+          var back = 1 + 2.2 * Math.pow(e - 1, 3) + 1.2 * Math.pow(e - 1, 2);
+          drop = (1 - back) * -70;
+          var op = Math.min(1, e * 2.2);
+          if (op !== it.op) { it.el.style.opacity = op; it.op = op; }
+          if (e < 1) it.sw = (1 - e) * 6 * Math.sin(e * 9);
+        }
+
+        it.y = yAt(x) - hookOff + drop;
+        it.el.style.transform = "translate3d(" + (x - gap / 2).toFixed(2) + "px," + it.y.toFixed(2) + "px,0)";
+        it.swing.style.transform = "rotate(" + (it.sw + it.idle).toFixed(3) + "deg)";
+        it.turn.style.transform = "perspective(" + rail.persp.toFixed(0) + "px) rotateY(" + it.ry.toFixed(2) + "deg) scale(" + it.s.toFixed(4) + ")";
+      }
+
+      // thanh tiến trình chạy vòng
+      var pr = mod(rail.offset, P.length * gap) / (P.length * gap);
+      var bw = rail.barW;
+      var x1 = (pr * 1.45 - 0.45) * bw;
+      progress[0].style.transform = "translateX(" + x1.toFixed(1) + "px)";
+      progress[1].style.transform = "translateX(" + (x1 - 1.45 * bw).toFixed(1) + "px)";
+
+      // bản 3D vẽ lại đúng các vị trí vừa tính
+      if (three) three.rail.render(rail);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* chuột / cảm ứng trên rail */
+  function local(e) {
+    var r = rail.el.getBoundingClientRect();
+    rail.pointer.x = e.clientX - r.left;
+    rail.pointer.y = e.clientY - r.top;
+  }
+  rail.el.addEventListener("pointerenter", function (e) { rail.pointer.inside = true; rail.pointer.touch = e.pointerType === "touch"; local(e); });
+  rail.el.addEventListener("pointerleave", function () { rail.pointer.inside = false; if (!rail.drag) setHover(null); });
+  rail.el.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0 || rail.hold) return;
+    local(e);
+    rail.pointer.touch = e.pointerType === "touch";
+    rail.drag = { id: e.pointerId, x: e.clientX, lastX: e.clientX, lastT: performance.now(), moved: 0, captured: false };
+  });
+  rail.el.addEventListener("pointermove", function (e) {
+    local(e);
+    rail.pointer.inside = true;
+    var d = rail.drag;
+    if (!d || d.id !== e.pointerId) return;
+    var dx = e.clientX - d.lastX, nowT = performance.now();
+    d.moved += Math.abs(dx);
+    if (d.moved > 6) {
+      if (!d.captured) { rail.el.setPointerCapture(e.pointerId); d.captured = true; rail.el.classList.add("is-dragging"); setHover(null); }
+      rail.offset -= dx;
+      var v = -dx / Math.max(0.008, (nowT - d.lastT) / 1000);
+      rail.vel = rail.vel * 0.6 + v * 0.4;
+    }
+    d.lastX = e.clientX; d.lastT = nowT;
+  });
+  function endDrag(e) {
+    var d = rail.drag;
+    if (!d || d.id !== e.pointerId) return;
+    rail.drag = null;
+    rail.el.classList.remove("is-dragging");
+    if (d.captured) { rail.vel = clamp(rail.vel, -2400, 2400); return; }
+    if (e.type !== "pointerup") return;
+    // chạm (hoặc bấm nhanh chưa kịp hover) thì lấy chiếc áo gần điểm bấm nhất
+    var py = rail.pointer.y, inBand = py > rail.railY - 16 && py < rail.railY + rail.sag + rail.H * 0.9;
+    var target = (!rail.pointer.touch && rail.hover) || (inBand ? nearestAt(rail.pointer.x) : null);
+    if (target) openDetail(target.p, { item: target });
+  }
+  rail.el.addEventListener("pointerup", endDrag);
+  rail.el.addEventListener("pointercancel", endDrag);
+  rail.el.addEventListener("wheel", function (e) {
+    var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : (e.shiftKey ? e.deltaY : 0);
+    if (!dx || rail.hold) return;
+    e.preventDefault();
+    rail.offset += dx;
+    rail.vel = clamp(dx * 22, -1600, 1600);
+  }, { passive: false });
+
+  /* ================= KHUNG CHI TIẾT ================= */
+  var D = {
+    el: $("[data-detail]"), fig: $("[data-detail-figure]"), turn: $("[data-detail-turn]"), img: $("[data-detail-img]"),
+    string: $("[data-detail-string]"), panel: $("[data-detail-panel]"),
+    idx: $("[data-d-index]"), name: $("[data-d-name]"), price: $("[data-d-price]"),
+    sizes: $("[data-d-sizes]"), add: $("[data-d-add]"), addLabel: $("[data-d-add-label]"),
+    viewcart: $("[data-d-viewcart]"), footName: $("[data-d-foot-name]"),
+    moreBtn: $("[data-d-more]"), more: $("[data-d-details]"), blurb: $("[data-d-blurb]"), list: $("[data-d-list]"), color: $("[data-d-color]"),
+    tabs: $$("[data-view]"), look: $("[data-detail-look]"),
+    tab: function (view) { return $('[data-view="' + view + '"]'); },
+    p: null, view: "front", size: null, source: null, open: false, busy: false, addT: 0, lastFocus: null
+  };
+  $$(".detail__panel > *").forEach(function (el, i) { el.style.setProperty("--i", i); });
+
+  function fill(p) {
+    D.p = p;
+    D.view = "front";
+    D.idx.textContent = (p.index + 1) + " / " + P.length;
+    D.name.textContent = p.name;
+    D.price.textContent = money(p.price);
+    D.footName.textContent = p.name;
+    D.img.src = frontOf(p);
+    D.img.alt = p.name + " — " + p.colorName;
+    D.tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.view === "front" ? "true" : "false"); });
+    // Tab: On model (khi có ảnh người mẫu) · Front · Back (khi có ảnh mặt sau).
+    // Không có cả hai thì ẩn hẳn hàng tab.
+    var hasBack = G.hasBack(p), look = p.onModel || "";
+    D.tab("model").hidden = !look;
+    D.tab("back").hidden = !hasBack;
+    D.tab("front").textContent = hasBack ? "Front" : "Product";
+    D.tabs[0].parentNode.hidden = !look && !hasBack;
+    D.el.classList.remove("is-look");
+    D.look.hidden = !look;
+    if (look) { D.look.src = look; D.look.alt = "Model wearing " + p.name; }
+
+    var sold = p.soldOut || [];
+    D.size = null;
+    D.sizes.innerHTML = "";
+    SIZES.forEach(function (s) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "radio");
+      b.textContent = s;
+      b.dataset.size = s;
+      if (sold.indexOf(s) >= 0) { b.disabled = true; b.setAttribute("aria-label", s + " — sold out"); }
+      if (!D.size && !b.disabled) D.size = s;
+      b.setAttribute("aria-checked", D.size === s && !b.disabled ? "true" : "false");
+      D.sizes.appendChild(b);
+    });
+
+    clearTimeout(D.addT);
+    D.add.classList.remove("is-loading");
+    D.addLabel.textContent = "Add to cart";
+    D.viewcart.hidden = true;
+
+    var copy = COPY[p.type];
+    D.blurb.textContent = copy.blurb;
+    D.list.innerHTML = copy.details.map(function (t) { return "<li>" + t + "</li>"; }).join("");
+    D.color.textContent = "Colour: " + p.colorName + " · " + p.cat;
+    D.more.hidden = true;
+    D.moreBtn.setAttribute("aria-expanded", "false");
+    backOf(p); // chuẩn bị sẵn mặt sau
+  }
+
+  function placeString() {
+    var fr = D.turn.getBoundingClientRect();
+    D.string.style.left = (fr.left + fr.width / 2 - 0.75) + "px";
+    D.string.style.height = Math.max(0, fr.top + fr.height * G.hookTop + 3) + "px";
+  }
+
+  /* Tính tư thế xuất phát (trên rail hoặc trong lưới) theo hệ toạ độ của khung chi tiết */
+  function sourcePose(src) {
+    var fr = D.fig.getBoundingClientRect();
+    var FW = fr.width, cx, top, w, ry = 0;
+    if (src.item) {
+      var it = src.item, rr = rail.el.getBoundingClientRect();
+      if (!it.vis) return null;
+      cx = rr.left + it.x; top = rr.top + it.y;
+      w = rail.W * (src.closing ? 1 : it.s);
+      ry = src.closing ? it.ry0 : it.ry;
+    } else if (src.card) {
+      var b = $(".card__flip", src.card).getBoundingClientRect();
+      if (b.bottom < 0 || b.top > window.innerHeight) return null;
+      w = b.width;
+      cx = b.left + b.width / 2;
+      top = b.top + (b.height - b.width * G.ratio) / 2;
+    } else return null;
+    var k = w / FW;
+    return {
+      t: "translate(" + (cx - (fr.left + FW / 2)) + "px," + (top - fr.top) + "px) scale(" + k + ") perspective(" + (FW * 3.2) + "px) rotateY(" + ry + "deg)",
+      end: "translate(0px,0px) scale(1) perspective(" + (FW * 3.2) + "px) rotateY(0deg)"
+    };
+  }
+
+  function openDetail(p, src) {
+    if (D.open || D.busy) return;
+    D.open = true; D.busy = true;
+    D.lastFocus = document.activeElement;
+    rail.hold = true;
+    closeSearch();
+    fill(p);
+    D.source = src || {};
+    D.el.hidden = false;
+    document.body.classList.add("is-locked");
+
+    var pose = sourcePose(D.source);
+    if (D.source.item) D.source.item.el.classList.add("is-away");
+    void D.el.offsetWidth;
+    D.el.classList.add("is-open");
+    placeString();
+
+    var anim = pose
+      ? D.turn.animate([{ transform: pose.t }, { transform: pose.end }], { duration: reduce ? 1 : 900, easing: "cubic-bezier(.22,.8,.2,1)" })
+      : D.turn.animate([{ opacity: 0, transform: "translateY(24px) scale(.96)" }, { opacity: 1, transform: "none" }], { duration: reduce ? 1 : 600, easing: "cubic-bezier(.22,.8,.2,1)" });
+    whenDone(anim, 900, function () {
+      D.busy = false;
+      if (!D.open) return;
+      // ảnh 2D vừa bay tới thì đổi sang mô hình 3D kéo xoay được
+      if (three) { three.detail.show(D.p.id, D.view); D.el.classList.add("is-3d"); }
+      // có ảnh người mẫu thì áo trên móc tan đi, người mẫu mặc áo đó hiện ra
+      showLook(D.p);
+    });
+    setTimeout(function () { D.panel.focus({ preventScroll: true }); }, 400);
+  }
+
+  function in3d() { return !!three && D.el.classList.contains("is-3d"); }
+
+  function showLook(p) {
+    if (!p.onModel) return;
+    D.el.classList.add("is-look");
+    setTabs("model");
+  }
+
+  function closeDetail(then) {
+    if (!D.open || D.busy) return;
+    if (D.el.classList.contains("is-look")) {
+      // người mẫu tan đi, áo trên móc hiện lại rồi mới bay về rail
+      D.busy = true;
+      D.el.classList.remove("is-look");
+      setTabs("front");
+      setTimeout(function () { D.busy = false; closeDetail(then); }, reduce ? 0 : 380);
+      return;
+    }
+    if (in3d()) {
+      // xoay về mặt gần nhất, đổi lại ảnh 2D của mặt đó rồi mới bay về chỗ cũ
+      D.busy = true;
+      three.detail.settle().then(function (view) {
+        var back = IMG[D.p.id] && IMG[D.p.id].back;
+        D.img.src = view === "back" && back ? back : frontOf(D.p);
+        three.detail.hide();
+        D.el.classList.remove("is-3d");
+        D.busy = false;
+        closeDetail(then);
+      });
+      return;
+    }
+    D.busy = true;
+    D.el.classList.remove("is-open");
+
+    // nếu đã chuyển sang sản phẩm khác bằng phím mũi tên, bay về chỗ của sản phẩm đó trên rail
+    var src = D.source;
+    if (src.item && src.item.p !== D.p) src = {};
+    if (!src.item && !src.card) {
+      var best = null;
+      rail.items.forEach(function (it) {
+        if (it.p === D.p && it.vis && (!best || Math.abs(it.x - rail.vw / 2) < Math.abs(best.x - rail.vw / 2))) best = it;
+      });
+      if (best && window.scrollY < window.innerHeight * 0.5) src = { item: best };
+    }
+    var pose = sourcePose({ item: src.item, card: src.card, closing: true });
+    if (D.source.item && D.source.item !== src.item) D.source.item.el.classList.remove("is-away");
+    if (src.item) src.item.el.classList.add("is-away");
+
+    var anim = pose
+      ? D.turn.animate([{ transform: pose.end }, { transform: pose.t }], { duration: reduce ? 1 : 750, easing: "cubic-bezier(.5,0,.2,1)" })
+      : D.turn.animate([{ opacity: 1 }, { opacity: 0, transform: "translateY(16px) scale(.97)" }], { duration: reduce ? 1 : 380, easing: "ease-in" });
+
+    whenDone(anim, 750, function () {
+      if (src.item) {
+        var it = src.item;
+        it.ry = it.ry0; it.s = 1;
+        it.el.classList.remove("is-away");
+      }
+      D.el.hidden = true;
+      D.open = false; D.busy = false;
+      rail.hold = false;
+      document.body.classList.remove("is-locked");
+      if (D.lastFocus && D.lastFocus.focus && !then) D.lastFocus.focus({ preventScroll: true });
+      if (then) then();
+    });
+  }
+
+  function setTabs(view) {
+    D.view = view;
+    D.tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.view === view ? "true" : "false"); });
+  }
+
+  function showView(view) {
+    if (view === D.view || !D.p) return;
+    var fromLook = D.view === "model";
+    setTabs(view);
+    D.el.classList.toggle("is-look", view === "model");
+    if (view === "model") return;
+    if (in3d()) { three.detail.face(view); return; }
+    if (fromLook) { // bản 2D: từ ảnh người mẫu về thì chỉ cần đúng ảnh, không cần lật
+      if (view === "back") backOf(D.p).then(function (u) { if (u && D.view === "back") D.img.src = u; });
+      else D.img.src = frontOf(D.p);
+      return;
+    }
+    var p = D.p;
+    var dir = view === "back" ? 1 : -1;
+    var out = D.img.animate([{ transform: "rotateY(0deg)" }, { transform: "rotateY(" + 90 * dir + "deg)" }], { duration: reduce ? 1 : 220, easing: "cubic-bezier(.5,0,.9,.6)", fill: "forwards" });
+    var src = view === "back" ? backOf(p) : Promise.resolve(frontOf(p));
+    whenDone(out, reduce ? 1 : 220, function () {
+      src.then(function (u) {
+        if (D.p !== p || D.view !== view) return;
+        D.img.src = u;
+        out.cancel();
+        D.img.animate([{ transform: "rotateY(" + -90 * dir + "deg)" }, { transform: "rotateY(0deg)" }], { duration: reduce ? 1 : 420, easing: "cubic-bezier(.2,.8,.2,1)" });
+      });
+    });
+  }
+
+  function step(dir) {
+    if (!D.open || D.busy) return;
+    var p = P[mod(D.p.index + dir, P.length)];
+    if (in3d()) { fill(p); three.detail.show(p.id, "front"); showLook(p); return; }
+    var a = D.img.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(" + (-24 * dir) + "px)" }], { duration: 180, easing: "ease-in", fill: "forwards" });
+    whenDone(a, 180, function () {
+      fill(p);
+      showLook(p);
+      a.cancel();
+      D.img.animate([{ opacity: 0, transform: "translateX(" + (24 * dir) + "px)" }, { opacity: 1, transform: "none" }], { duration: 360, easing: "cubic-bezier(.2,.8,.2,1)" });
+    });
+  }
+
+  D.tabs.forEach(function (t) { t.addEventListener("click", function () { showView(t.dataset.view); }); });
+
+  D.sizes.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    D.size = b.dataset.size;
+    $$("button", D.sizes).forEach(function (x) { x.setAttribute("aria-checked", x === b ? "true" : "false"); });
+  });
+
+  D.add.addEventListener("click", function () {
+    if (!D.size) {
+      D.sizes.classList.remove("is-shake"); void D.sizes.offsetWidth; D.sizes.classList.add("is-shake");
+      toast("Please choose a size");
+      return;
+    }
+    var p = D.p, size = D.size;
+    clearTimeout(D.addT);
+    D.add.classList.add("is-loading");
+    D.addLabel.textContent = "Add to cart";
+    D.addT = setTimeout(function () {
+      D.add.classList.remove("is-loading");
+      D.addLabel.textContent = "Added to cart";
+      D.viewcart.hidden = false;
+      var back = in3d() && three.detail.facing() === "back" && IMG[p.id].back;
+      flyToBag(D.img, function () { cartAdd(p.id, size, 1); }, back || null);
+      D.addT = setTimeout(function () { D.addLabel.textContent = "Add to cart"; }, 2600);
+    }, reduce ? 10 : 750);
+  });
+
+  D.viewcart.addEventListener("click", function (e) {
+    e.preventDefault();
+    closeDetail(function () { openCart(); });
+  });
+  D.moreBtn.addEventListener("click", function () {
+    var open = D.more.hidden;
+    D.more.hidden = !open;
+    D.moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  $$("[data-detail-close]").forEach(function (b) { b.addEventListener("click", function () { closeDetail(); }); });
+
+  /* Ảnh nhỏ bay từ khung chi tiết vào túi giỏ hàng */
+  function flyToBag(imgEl, done, src) {
+    var from = imgEl.getBoundingClientRect();
+    var bag = $("[data-cart-open]").getBoundingClientRect();
+    if (reduce || !from.width) { done(); return; }
+    var w = from.width * 0.62, h = from.height * 0.62;
+    var f = document.createElement("div");
+    f.className = "fly";
+    f.style.width = w + "px"; f.style.height = h + "px";
+    f.innerHTML = '<img alt="" src="' + (src || imgEl.src) + '">';
+    document.body.appendChild(f);
+    // toạ độ tính theo tâm hộp (transform-origin mặc định ở giữa)
+    var sx = from.left + from.width / 2, sy = from.top + 10 + h / 2;
+    var ex = bag.left + bag.width / 2, ey = bag.top + bag.height / 2;
+    var mx = sx + (ex - sx) * 0.55, my = ey + (sy - ey) * 0.3;
+    function at(x, y, s) { return "translate(" + (x - w / 2) + "px," + (y - h / 2) + "px) scale(" + s + ")"; }
+    var a = f.animate([
+      { transform: at(sx, sy, 1), opacity: 1 },
+      { transform: at(mx, my, 0.42), opacity: 1, offset: 0.55 },
+      { transform: at(ex, ey, 0.04), opacity: 0.3 }
+    ], { duration: 950, easing: "cubic-bezier(.45,0,.25,1)", fill: "forwards" });
+    whenDone(a, 950, function () { f.remove(); done(); });
+  }
+
+  /* ================= GIỎ HÀNG ================= */
+  var C = {
+    el: $("[data-cart]"), lines: $("[data-cart-lines]"), n: $("[data-cart-n]"), total: $("[data-cart-total]"),
+    badge: $("[data-bag-count]"),
+    discToggle: $("[data-disc-toggle]"), discForm: $("[data-disc-form]"), discInput: $("[data-disc-input]"),
+    discRow: $("[data-disc-row]"), discLabel: $("[data-disc-label]"), discAmount: $("[data-disc-amount]"),
+    items: store.get("ardor-cart-v1") || [],
+    code: store.get("ardor-code-v1") || null
+  };
+  var CODES = { ARDOR10: 0.1 };
+  C.items = C.items.filter(function (l) { return byId[l.id] && l.qty > 0; });
+
+  function keyOf(l) { return l.id + "|" + l.size; }
+
+  function cartAdd(id, size, qty) {
+    var l = C.items.filter(function (x) { return x.id === id && x.size === size; })[0];
+    if (l) l.qty = Math.min(20, l.qty + qty);
+    else C.items.unshift({ id: id, size: size, qty: qty });
+    store.set("ardor-cart-v1", C.items);
+    renderCart();
+    C.badge.classList.remove("is-bump"); void C.badge.offsetWidth; C.badge.classList.add("is-bump");
+  }
+
+  var TRASH = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5M7 7v4M9 7v4"/></svg>';
+
+  function renderCart() {
+    var count = 0, sub = 0;
+    var seen = {};
+    C.items.forEach(function (l, idx) {
+      var p = byId[l.id], k = keyOf(l);
+      count += l.qty; sub += p.price * l.qty;
+      seen[k] = true;
+      var li = C.lines.querySelector('[data-key="' + k + '"]');
+      if (!li) {
+        li = document.createElement("li");
+        li.className = "line";
+        li.dataset.key = k;
+        li.innerHTML =
+          '<div class="line__img"><img alt="" src="' + frontOf(p) + '"></div>' +
+          '<div><p class="line__name">' + p.name + '</p><p class="line__meta">' + l.size + "<br>" + money(p.price) + "</p>" +
+          '<div class="line__ctrl"><div class="stepper"><button type="button" data-dec aria-label="Giảm">−</button><span data-q></span><button type="button" data-inc aria-label="Tăng">+</button></div>' +
+          '<button type="button" class="line__del" data-del aria-label="Xoá ' + p.name + '">' + TRASH + "</button></div></div>" +
+          '<p class="line__sum" data-sum></p>';
+      }
+      var img = li.querySelector("img");
+      if (!img.getAttribute("src") && frontOf(p)) img.src = frontOf(p);
+      li.querySelector("[data-q]").textContent = l.qty;
+      li.querySelector("[data-sum]").textContent = money(p.price * l.qty);
+      if (C.lines.children[idx] !== li) C.lines.insertBefore(li, C.lines.children[idx] || null);
+    });
+    $$(".line", C.lines).forEach(function (li) {
+      if (!seen[li.dataset.key] && !li.classList.contains("is-out")) {
+        li.classList.add("is-out");
+        setTimeout(function () { li.remove(); }, 300);
+      }
+    });
+
+    var rate = C.code && CODES[C.code] ? CODES[C.code] : 0;
+    var off = Math.round(sub * rate / 1000) * 1000;
+    C.discRow.hidden = !rate;
+    if (rate) { C.discLabel.textContent = C.code + " (−" + rate * 100 + "%)"; C.discAmount.textContent = "−" + money(off); }
+    C.total.textContent = money(sub - off);
+    C.n.textContent = count;
+    C.badge.textContent = count;
+    C.badge.hidden = count === 0;
+    C.el.classList.toggle("is-empty", count === 0);
+  }
+
+  C.lines.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    var key = b.closest(".line").dataset.key;
+    var l = C.items.filter(function (x) { return keyOf(x) === key; })[0];
+    if (!l) return;
+    if (b.hasAttribute("data-inc")) l.qty = Math.min(20, l.qty + 1);
+    else if (b.hasAttribute("data-dec")) l.qty -= 1;
+    else if (b.hasAttribute("data-del")) l.qty = 0;
+    C.items = C.items.filter(function (x) { return x.qty > 0; });
+    store.set("ardor-cart-v1", C.items);
+    renderCart();
+  });
+
+  C.discToggle.addEventListener("click", function () {
+    var open = C.discForm.hidden;
+    C.discForm.hidden = !open;
+    C.discToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) C.discInput.focus();
+  });
+  C.discForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var code = C.discInput.value.trim().toUpperCase();
+    if (!CODES[code]) { toast("That code isn't valid"); return; }
+    C.code = code;
+    store.set("ardor-code-v1", code);
+    toast("Code " + code + " applied");
+    C.discForm.hidden = true;
+    C.discToggle.setAttribute("aria-expanded", "false");
+    renderCart();
+  });
+  $("[data-checkout]").addEventListener("click", function () {
+    toast("Checkout isn't connected yet — your cart is saved on this device.");
+  });
+
+  function openCart() {
+    closeSearch();
+    document.body.classList.add("cart-open");
+    C.el.setAttribute("aria-hidden", "false");
+    setTimeout(function () { $("[data-cart-close]").focus({ preventScroll: true }); }, 60);
+  }
+  function closeCart() {
+    document.body.classList.remove("cart-open");
+    C.el.setAttribute("aria-hidden", "true");
+  }
+  $("[data-cart-open]").addEventListener("click", function () {
+    document.body.classList.contains("cart-open") ? closeCart() : openCart();
+  });
+  $$("[data-cart-close]").forEach(function (b) { b.addEventListener("click", closeCart); });
+
+  /* ================= TÌM KIẾM ================= */
+  var S = { box: $("[data-search]"), panel: $("[data-search-panel]"), input: $("[data-search-input]"), list: $("[data-search-list]"), open: false };
+
+  function renderSearch() {
+    var q = S.input.value.trim().toLowerCase();
+    var hits = P.filter(function (p) {
+      return !q || (p.name + " " + p.colorName + " " + p.cat).toLowerCase().indexOf(q) >= 0;
+    });
+    S.list.innerHTML = hits.length
+      ? hits.map(function (p, i) {
+          return '<li><button type="button" data-id="' + p.id + '"' + (i === 0 && q ? ' class="is-active"' : "") + '><img alt="" src="' + frontOf(p) + '"><span>' + p.name + '</span><span class="p">' + money(p.price) + "</span></button></li>";
+        }).join("")
+      : '<li class="search__empty">Nothing on the rail matches “' + S.input.value.replace(/[<>&"]/g, "") + "”.</li>";
+  }
+  function openSearch() {
+    S.open = true;
+    S.panel.hidden = false;
+    renderSearch();
+    S.input.focus();
+  }
+  function closeSearch() {
+    if (!S.open) return;
+    S.open = false;
+    S.panel.hidden = true;
+  }
+  function pickProduct(p) {
+    closeSearch();
+    var best = null;
+    if (window.scrollY < window.innerHeight * 0.5) {
+      rail.items.forEach(function (it) {
+        if (it.p === p && it.vis && it.x > 0 && it.x < rail.vw && (!best || Math.abs(it.x - rail.vw / 2) < Math.abs(best.x - rail.vw / 2))) best = it;
+      });
+    }
+    openDetail(p, best ? { item: best } : null);
+  }
+  $("[data-search-open]").addEventListener("click", function () { S.open ? closeSearch() : openSearch(); });
+  S.input.addEventListener("input", renderSearch);
+  S.input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      var b = $("button", S.list);
+      if (b) pickProduct(byId[b.dataset.id]);
+    }
+  });
+  S.list.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-id]");
+    if (b) pickProduct(byId[b.dataset.id]);
+  });
+  document.addEventListener("pointerdown", function (e) {
+    if (S.open && !S.box.contains(e.target)) closeSearch();
+  });
+
+  /* ================= LƯỚI SẢN PHẨM ================= */
+  var grid = $("[data-grid]");
+  function buildGrid() {
+    grid.innerHTML = P.map(function (p) {
+      var sizes = SIZES.map(function (s) { return (p.soldOut || []).indexOf(s) >= 0 ? "<s>" + s + "</s>" : s; }).join(" ");
+      return '<article class="card' + (G.hasBack(p) ? "" : " card--single") + '" data-cat="' + p.cat + '" data-id="' + p.id + '">' +
+        '<button type="button" class="card__media" aria-label="' + p.name + ", " + money(p.price) + '">' +
+          '<span class="card__badge">' + p.cat + "</span>" +
+          '<span class="card__swing"><span class="card__flip"><img alt="" src="' + frontOf(p) + '"><img alt="" data-back></span></span>' +
+          '<span class="card__quick">Choose size</span>' +
+        "</button>" +
+        '<div class="card__info"><h3 class="card__name">' + p.name + '</h3><p class="card__price">' + money(p.price) + "</p>" +
+        '<p class="card__color">' + p.colorName + '</p><p class="card__sizes">' + sizes + "</p></div>" +
+        "</article>";
+    }).join("");
+    $("[data-count]").textContent = P.length + " pieces";
+
+    // mặt sau nạp dần khi lưới sắp vào khung nhìn
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        io.unobserve(en.target);
+        var p = byId[en.target.dataset.id];
+        backOf(p).then(function (u) { if (u) $("[data-back]", en.target).src = u; });
+      });
+    }, { rootMargin: "300px" });
+    $$(".card", grid).forEach(function (c) { io.observe(c); });
+  }
+  grid.addEventListener("click", function (e) {
+    var b = e.target.closest(".card__media");
+    if (!b) return;
+    var card = b.closest(".card");
+    openDetail(byId[card.dataset.id], { card: card });
+  });
+  $("[data-filters]").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-filter]");
+    if (!b) return;
+    var f = b.dataset.filter, n = 0;
+    $$("button", b.parentNode).forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+    $$(".card", grid).forEach(function (c) {
+      var on = f === "all" || c.dataset.cat === f;
+      c.hidden = !on;
+      if (on) { n++; c.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: n * 25, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" }); }
+    });
+    $("[data-count]").textContent = n + (n === 1 ? " piece" : " pieces");
+  });
+
+  /* ================= PHÍM TẮT ================= */
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      if (S.open) { closeSearch(); return; }
+      if (D.open) { closeDetail(); return; }
+      if (document.body.classList.contains("cart-open")) { closeCart(); return; }
+    }
+    if (D.open && (e.key === "ArrowRight" || e.key === "ArrowLeft") && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
+      e.preventDefault();
+      step(e.key === "ArrowRight" ? 1 : -1);
+    }
+    if (D.open && e.key === "Tab") { // giữ focus trong khung chi tiết
+      var f = $$("button:not([disabled]):not([hidden]), a:not([hidden])", D.el).filter(function (x) { return x.offsetParent; });
+      if (!f.length) return;
+      var first = f[0], lastF = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastF.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastF) { e.preventDefault(); first.focus(); }
+    }
+  });
+
+  /* ================= KHỞI ĐỘNG ================= */
+  $$(".hero .headline .w").forEach(function (w, i) { w.style.setProperty("--i", i); });
+  if (window.matchMedia("(hover: none)").matches) $("[data-now-hint]").textContent = "Tap a piece to look closer · swipe the rail";
+
+  new ResizeObserver(function () { if (rail.copies) layout(); }).observe(rail.el);
+  window.addEventListener("resize", function () { if (D.open) placeString(); });
+
+  /* Bật 3D khi js/three3d.js đã nạp xong và mọi ảnh (trước + sau) đã treo móc.
+     Hỏng ở bước nào thì web vẫn chạy bằng ảnh 2D. */
+  function start3D() {
+    var api = window.Ardor3D;
+    if (!api) { window.addEventListener("ardor3d", start3D, { once: true }); return; }
+    Promise.all(P.map(function (p) {
+      return backOf(p).then(function (b) { return { id: p.id, type: p.type, front: frontOf(p), back: b }; });
+    })).then(api.load).then(function () {
+      three = api;
+      api.rail.mount(rail.el);
+      rail.el.classList.add("rail--3d");
+      // xoay qua nửa vòng thì tab Front/Back tự đổi theo (trừ khi đang xem ảnh người mẫu)
+      api.detail.mount(D.fig, function (side) { if (D.view !== "model") setTabs(side); });
+    }).catch(function (e) {
+      if (window.console) console.warn("ARDOR 3D off:", e);
+    });
+  }
+
+  renderCart();
+  loadFronts().then(function () {
+    build(2);
+    layout();
+    buildGrid();
+    renderCart();
+    rail.start = performance.now();
+    rail.ready = true;
+    root.classList.add("is-ready");
+    start3D();
+    // nạp sẵn ảnh người mẫu để lúc bấm vào áo là hiện ngay
+    P.forEach(function (p) { if (p.onModel) new Image().src = p.onModel; });
+  });
+  requestAnimationFrame(frame);
+})();
