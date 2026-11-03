@@ -43,6 +43,9 @@
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 7h11l-.9 10H5.4z"/><path d="M7.5 7V5.8a2.5 2.5 0 0 1 5 0V7"/></svg>
         <span class="bag__count" data-bag-count hidden>0</span>
       </button>
+      <button class="icon-btn nav__menu" type="button" data-menu-open aria-label="Mở menu danh mục" aria-expanded="false">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6.5h13M3.5 10h13M3.5 13.5h9"/></svg>
+      </button>
     </div>
   </header>
 
@@ -105,7 +108,7 @@
     <div class="footer__cols">
       <div>
         <p class="footer__h">Shop</p>
-        <a href="#collection">Hoodies</a><a href="#collection">Tops</a><a href="#collection">Bottoms</a>
+        <a href="#collection" data-filter-link="Hoodies">Hoodies</a><a href="#collection" data-filter-link="Tops">Tops</a><a href="#collection" data-filter-link="Bottoms">Bottoms</a>
       </div>
       <div>
         <p class="footer__h">Help</p>
@@ -183,6 +186,28 @@
     <button class="cart__checkout" type="button" data-checkout>Check out</button>
   </footer>
 </aside>
+
+<!-- ===== Menu danh mục (điện thoại) ===== -->
+<div class="menu" data-menu hidden>
+  <div class="menu__veil" data-menu-close></div>
+  <nav class="menu__panel" aria-label="Danh mục">
+    <header class="menu__head">
+      <p class="menu__logo">ARDOR</p>
+      <button class="cart__x" type="button" data-menu-close aria-label="Đóng menu">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3 3 13"/></svg>
+      </button>
+    </header>
+    <p class="menu__h">Shop by category</p>
+    <ul class="menu__cats" data-menu-cats></ul>
+    <p class="menu__h">Explore</p>
+    <ul class="menu__links">
+      <li><a href="#top" data-menu-close>Scene Rail</a></li>
+      <li><a href="#collection" data-menu-close>Collection</a></li>
+      <li><a href="#contact" data-menu-close>Account</a></li>
+      <li><a href="#contact" data-menu-close>Contact</a></li>
+    </ul>
+  </nav>
+</div>
 
 <div class="toast" data-toast role="status" aria-live="polite"></div>
 

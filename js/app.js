@@ -994,22 +994,81 @@
     var card = b.closest(".card");
     openDetail(byId[card.dataset.id], { card: card });
   });
-  $("[data-filters]").addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-filter]");
-    if (!b) return;
-    var f = b.dataset.filter, n = 0;
-    $$("button", b.parentNode).forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+  /* Lọc lưới theo dòng (dùng chung cho nút lọc, menu danh mục và link ở chân trang) */
+  function setFilter(f) {
+    var n = 0;
+    $$("[data-filters] button").forEach(function (x) { x.setAttribute("aria-pressed", x.dataset.filter === f ? "true" : "false"); });
+    $$("[data-menu-cat]").forEach(function (x) { x.setAttribute("aria-current", x.dataset.menuCat === f ? "true" : "false"); });
     $$(".card", grid).forEach(function (c) {
       var on = f === "all" || c.dataset.cat === f;
       c.hidden = !on;
       if (on) { n++; c.animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }], { duration: 420, delay: n * 25, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" }); }
     });
     $("[data-count]").textContent = n + (n === 1 ? " piece" : " pieces");
+  }
+  function showCategory(f) {
+    setFilter(f);
+    $("#collection").scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
+  }
+  $("[data-filters]").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-filter]");
+    if (b) setFilter(b.dataset.filter);
   });
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest("[data-filter-link]");
+    if (!a) return;
+    e.preventDefault();
+    showCategory(a.dataset.filterLink);
+  });
+
+  /* ================= MENU DANH MỤC (điện thoại) ================= */
+  var M = { el: $("[data-menu]"), btn: $("[data-menu-open]"), cats: $("[data-menu-cats]") };
+  function buildMenu() {
+    if (!M.cats) return;
+    // cùng thứ tự với các nút lọc của lưới; dòng mới chưa có nút thì xếp cuối
+    var cats = $$("[data-filters] button").map(function (b) { return b.dataset.filter; }).filter(function (f) { return f !== "all"; });
+    P.forEach(function (p) { if (cats.indexOf(p.cat) < 0) cats.push(p.cat); });
+    cats = cats.filter(function (c) { return P.some(function (p) { return p.cat === c; }); });
+    var rows = [{ f: "all", name: "All products", n: P.length, p: P[0] }].concat(cats.map(function (c) {
+      var list = P.filter(function (p) { return p.cat === c; });
+      return { f: c, name: c, n: list.length, p: list[0] };
+    }));
+    M.cats.innerHTML = rows.map(function (r) {
+      return '<li><button type="button" class="menu__cat" data-menu-cat="' + r.f + '" aria-current="' + (r.f === "all" ? "true" : "false") + '">' +
+        '<span class="menu__thumb"><img alt="" src="' + frontOf(r.p) + '"></span>' +
+        '<span class="menu__name">' + r.name + '</span><span class="menu__n">' + r.n + "</span></button></li>";
+    }).join("");
+  }
+  function openMenu() {
+    if (!M.el) return;
+    closeSearch();
+    M.el.hidden = false;
+    requestAnimationFrame(function () { M.el.classList.add("is-open"); });
+    document.body.classList.add("is-locked");
+    M.btn.setAttribute("aria-expanded", "true");
+    var first = $(".menu__cat", M.el);
+    if (first) setTimeout(function () { first.focus({ preventScroll: true }); }, 60);
+  }
+  function closeMenu() {
+    if (!M.el || M.el.hidden) return;
+    M.el.classList.remove("is-open");
+    document.body.classList.remove("is-locked");
+    M.btn.setAttribute("aria-expanded", "false");
+    setTimeout(function () { if (!M.el.classList.contains("is-open")) M.el.hidden = true; }, 380);
+  }
+  if (M.el) {
+    M.btn.addEventListener("click", openMenu);
+    M.el.addEventListener("click", function (e) {
+      var c = e.target.closest("[data-menu-cat]");
+      if (c) { closeMenu(); showCategory(c.dataset.menuCat); return; }
+      if (e.target.closest("[data-menu-close]")) closeMenu();
+    });
+  }
 
   /* ================= PHÍM TẮT ================= */
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
+      if (M.el && !M.el.hidden) { closeMenu(); return; }
       if (S.open) { closeSearch(); return; }
       if (D.open) { closeDetail(); return; }
       if (document.body.classList.contains("cart-open")) { closeCart(); return; }
@@ -1062,6 +1121,7 @@
     build(2);
     layout();
     buildGrid();
+    buildMenu();
     renderCart();
     rail.start = performance.now();
     rail.ready = true;
