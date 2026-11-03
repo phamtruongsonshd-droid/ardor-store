@@ -183,30 +183,43 @@
   }
 
   /* Dây xích = một ô ảnh chụp thật (mắt tròn + mắt nghiêng) lặp liên tiếp dọc đường võng.
-     Ô rộng hơn nhịp lặp một chút (đầu cong của mắt tròn); ô sau vẽ đè ô trước nên chỗ nối liền. */
+     Ô rộng hơn nhịp lặp một chút (đầu cong của mắt tròn); ô sau vẽ đè ô trước nên chỗ nối liền.
+     Các móc gắn trên xích nên xích trôi cùng áo: lệch theo rail.offset (tự trôi, kéo, lăn). */
   var CHAIN_STEP = 141.5 / 153; // nhịp lặp / bề rộng ảnh ô
+  var chain = { ctx: null, w: 0, h: 0, step: 0, phase: -1 };
+  // đổi cỡ: dựng lại canvas rồi vẽ
   function drawChain() {
     var cv = rail.chainCv, img = rail.chainImg;
     if (!cv || !img || !img.naturalWidth || !rail.vw) return;
     var dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(rail.vw * dpr);
     cv.height = Math.round(rail.vh * dpr);
-    var ctx = cv.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.imageSmoothingQuality = "high";
-    var h = rail.chainH, w = img.naturalWidth * h / img.naturalHeight, step = w * CHAIN_STEP;
-    var x = -w * 1.5;
-    while (x < rail.vw + w) {
-      // bước theo độ dài cung để mắt xích không bị giãn ở hai đầu dốc
-      var y = yAt(x), x2 = x + step, len = Math.hypot(step, yAt(x2) - y);
-      x2 = x + step * step / len;
-      var ang = Math.atan2(yAt(x2) - y, x2 - x);
+    chain.ctx = cv.getContext("2d");
+    chain.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    chain.ctx.imageSmoothingQuality = "high";
+    chain.h = rail.chainH;
+    chain.w = img.naturalWidth * chain.h / img.naturalHeight;
+    chain.step = chain.w * CHAIN_STEP;
+    chain.phase = -1;
+    paintChain();
+  }
+  /* Ô đặt cách đều theo trục ngang (đường võng thoải nên mắt xích không giãn thấy được),
+     nhờ vậy lệch đúng một nhịp là hình lặp lại y hệt: trôi mãi không giật */
+  function paintChain() {
+    var ctx = chain.ctx, img = rail.chainImg;
+    if (!ctx) return;
+    var phase = Math.round(mod(rail.offset, chain.step) * 100) / 100;
+    if (phase === chain.phase) return;
+    chain.phase = phase;
+    var h = chain.h, w = chain.w, step = chain.step;
+    ctx.clearRect(0, 0, rail.vw, rail.vh);
+    for (var x = -w * 1.5 - phase; x < rail.vw + w; x += step) {
+      var y = yAt(x);
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(ang);
+      ctx.rotate(Math.atan2(yAt(x + step) - y, step));
       ctx.drawImage(img, 0, -h * 0.5, w, h);
       ctx.restore();
-      x = x2;
     }
   }
   if (rail.chainCv && rail.el.dataset.chain) {
@@ -366,6 +379,7 @@
 
       // bản 3D vẽ lại đúng các vị trí vừa tính
       if (three) three.rail.render(rail);
+      paintChain();
     }
     requestAnimationFrame(frame);
   }
