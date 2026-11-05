@@ -241,10 +241,26 @@ function makeRenderer(canvas, maxDpr) {
 /* ================= RAIL ================= */
 /* Bóng đổ theo chuột: một đèn spot (gần như không phát sáng, chỉ để tính bóng) đặt trước
    rail tại vị trí con trỏ; bóng áo in lên một "bức tường" trong suốt phía sau (ShadowMaterial).
-   Áo càng xa đèn thì bóng càng lệch ra xa. Máy cảm ứng không có đèn này (dùng bóng CSS tĩnh). */
-const WALL = 260; // tường nhận bóng nằm sau rail bao xa (px)
+   Áo càng xa đèn thì bóng càng lệch ra xa. Máy cảm ứng không có đèn này (dùng bóng CSS tĩnh).
+   Bóng dài hơn khung canvas nên mờ dần ở mép trên/dưới, không bị cắt thành đường thẳng. */
+const WALL = 200; // tường nhận bóng nằm sau rail bao xa (px)
+const FADE_BOTTOM = 0.26, FADE_TOP = 0.1; // dải mờ dần, tính theo chiều cao khung rail
+
+function shadowMaterial(fade) {
+  const m = new THREE.ShadowMaterial({ color: 0x281a0c, opacity: 0.2 });
+  m.onBeforeCompile = (s) => {
+    s.uniforms.uFade = fade;
+    s.fragmentShader = "uniform vec3 uFade;\n" + s.fragmentShader.replace(
+      "#include <tonemapping_fragment>",
+      "gl_FragColor.a *= smoothstep( 0.0, uFade.y, gl_FragCoord.y ) * smoothstep( 0.0, uFade.z, uFade.x - gl_FragCoord.y );\n#include <tonemapping_fragment>"
+    );
+  };
+  return m;
+}
+
 const rail = {
   renderer: null, scene: null, camera: null, groups: [], w: 0, h: 0, lamp: null, wall: null, lampZ: 0,
+  fade: { value: new THREE.Vector3(1, 1, 1) }, // chiều cao khung, dải mờ đáy, dải mờ đỉnh (điểm ảnh thật)
 
   mount(el) {
     const c = document.createElement("canvas");
@@ -263,7 +279,7 @@ const rail = {
       lamp.shadow.mapSize.set(2048, 2048);
       lamp.shadow.bias = -0.0004;
       this.scene.add(lamp, lamp.target);
-      this.wall = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ color: 0x281a0c, opacity: 0.26 }));
+      this.wall = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shadowMaterial(this.fade));
       this.wall.receiveShadow = true;
       this.scene.add(this.wall);
     }
@@ -286,11 +302,14 @@ const rail = {
         this.wall.position.set(st.vw / 2, -st.vh / 2, -WALL);
         this.wall.scale.set(st.vw * f * 1.6, st.vh * f * 1.6, 1);
         // Tường xa hơn thì camera thấy bóng co về giữa; đèn đặt gần (0.7 bề rộng) để bóng
-        // vẫn toả ra xa đèn rõ ràng: lệch ≈ 12% khoảng cách từ áo tới con trỏ
-        this.lampZ = st.vw * 0.7;
+        // vẫn toả ra xa đèn rõ ràng: lệch ≈ 9% khoảng cách từ áo tới con trỏ.
+        // Cửa sổ hẹp vẫn giữ đèn đủ xa, nếu không bóng phóng to và lệch quá đà
+        this.lampZ = Math.max(st.vw, 1200) * 0.7;
         this.lamp.shadow.camera.near = this.lampZ * 0.4;
         this.lamp.shadow.camera.far = this.lampZ + WALL * 2;
         this.lamp.shadow.camera.updateProjectionMatrix();
+        const px = st.vh * this.renderer.getPixelRatio();
+        this.fade.value.set(px, px * FADE_BOTTOM, px * FADE_TOP);
       }
     }
     if (this.lamp && st.light) {
