@@ -985,7 +985,7 @@
           '<span class="card__swing"><span class="card__flip"><img alt="" src="' + frontOf(p) + '"><img alt="" data-back></span></span>' +
           '<span class="card__quick">Choose size</span>' +
         "</button>" +
-        '<div class="card__info"><h3 class="card__name">' + p.name + '</h3><p class="card__price">' + money(p.price) + "</p>" +
+        '<div class="card__info"><h3 class="card__name">' + (p.url ? '<a href="' + p.url + '">' + p.name + "</a>" : p.name) + '</h3><p class="card__price">' + money(p.price) + "</p>" +
         '<p class="card__color">' + p.colorName + '</p><p class="card__sizes">' + sizes + "</p></div>" +
         "</article>";
     }).join("");
@@ -1003,8 +1003,12 @@
     $$(".card", grid).forEach(function (c) { io.observe(c); });
   }
   grid.addEventListener("click", function (e) {
-    var b = e.target.closest(".card__media");
+    // tên sản phẩm là link thật cho Google; bấm thường vẫn mở khung chi tiết, Ctrl/Cmd mới mở trang riêng
+    var link = e.target.closest(".card__name a");
+    if (link && (e.metaKey || e.ctrlKey || e.shiftKey)) return;
+    var b = link || e.target.closest(".card__media");
     if (!b) return;
+    if (link) e.preventDefault();
     var card = b.closest(".card");
     openDetail(byId[card.dataset.id], { card: card });
   });
